@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GAN Pro CFOP Trainer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Poppins:wght@400;600;700&family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #3b82f6; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+            --games: #f43f5e; --trainer: #8b5cf6;
+            --bg: #020617; --glass: rgba(15, 23, 42, 0.95); --border: rgba(255, 255, 255, 0.1);
+        }
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100vh;
+            font-family: 'Inter', sans-serif; background: var(--bg);
+            color: white; overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        #viewport { 
+            flex: 1; position: relative; 
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); 
+            transition: background 0.5s ease-in-out;
+        }
+        
+        #ui-bottom { 
+            height: 70px; background: var(--glass); border-top: 1px solid var(--border); 
+            display: flex; flex-direction: row; align-items: center; padding: 10px 15px; gap: 15px; z-index: 100; 
+        }
+
+        .glass-panel { background: var(--glass); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 12px; }
+        
+        .top-left { 
+            position: absolute; top: 15px; left: 15px; padding: 10px; 
+            display: flex; gap: 5px; z-index: 50; flex-wrap: wrap; max-width: 75%;
+        }
+        .top-right { position: absolute; top: 15px; right: 15px; width: 220px; padding: 12px; z-index: 50; }
+        
+        .right-toolbar {
+            position: absolute; right: 20%; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 10px; z-index: 50; padding: 10px;
+        }
+
+        .controls-panel {
+            position: absolute;top:40%; left: 20%; transform: translateX(-50%);
+            padding: 20px; z-index: 60; display: none; width: 340px;
+            box-shadow: 0 15px 40px rgb(0,0,0,0.6);
+            border-radius: 16px;
+        }
+
+        .timer-center {
+            position: absolute; top: 10%; left: 50%; transform: translateX(-50%);
+            text-align: center; pointer-events: none; z-index: 40; width: 90%;
+        }
+        #main-timer { font-family: 'JetBrains Mono', monospace; font-size: clamp(50px, 8vw, 80px); font-weight: 800; line-height: 1; transition: color 0.2s, transform 0.1s; }
+        
+        #sequence-wrapper { 
+            background: rgba(0,0,0,0.85); padding: 15px 25px; border-radius: 12px; 
+            display: inline-block; margin-top: 30px; border: 1px solid var(--border); 
+            pointer-events: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transform: translateY(400%);
+        }
+        #sequence-display { font-family: 'Poppins'; font-size: 30px; font-weight: bold; }
+        #sequence-translation { font-family: 'Poppins'; font-size: 14px; font-weight: 600; color: var(--accent); margin-top: 15px; }
+
+        .mode-btn { 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+            padding: 10px 14px; border: none; border-radius: 8px; background: transparent; 
+            color: #94a3b8; font-weight: 700; font-size: 11px; cursor: pointer; transition: 0.3s;
+            min-width: 80px;
+        }
+        .mode-btn:hover { background: rgba(255,255,255,0.05); color: white; }
+        .mode-btn svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .mode-btn.active { color: white; }
+
+        .history-rail { flex: 1; display: flex; align-items: center; gap: 8px; overflow-x: auto; scroll-behavior: smooth; }
+        .history-rail::-webkit-scrollbar { display: none; }
+        .move-pill { flex-shrink: 0; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; border: 1px solid var(--border); }
+        
+        .btn { padding: 12px 15px; border-radius: 8px; border: none; background: var(--accent); color: white; font-weight: 700; font-size: 13px; cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center;}
+        .btn:hover { opacity: 0.8; transform: translateY(-1px); }
+        .btn-outline { background: rgba(255,255,255,0.05); color: #cbd5e1; border: 1px solid var(--border); }
+        
+        .icon-btn { width: 48px; height: 48px; padding: 0; border-radius: 12px; }
+        .icon-btn svg { width: 22px; height: 22px; }
+
+        input, select { width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 8px; padding: 10px; color: white; font-family: 'JetBrains Mono', monospace; font-size: 12px; outline: none; margin-bottom: 12px;}
+        select option { background: var(--bg); color: white; padding: 10px;}
+
+        #large-move { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 25vh; font-weight: 900; opacity: 0.03; pointer-events: none; }
+        
+        .social-dock { display: flex; gap: 12px; margin-left: auto; }
+        .social-btn {
+            width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-decoration: none; border-radius: 14px;
+        }
+        .social-btn:hover { transform: scale(1.15) rotate(5deg); background: rgba(255,255,255,0.1); }
+        .social-btn svg { width: 22px; height: 22px; fill: white; }
+        
+        #instruction { 
+            position: absolute; top: 30px; left: 50%; transform: translateX(-50%); 
+            color: var(--warning); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; 
+            font-size: 13px; text-align: center; background: rgba(0,0,0,0.85); 
+            padding: 12px 24px; border-radius: 20px; border: 1px solid var(--warning); z-index: 60;
+            backdrop-filter: blur(5px);
+        }
+
+        .wrong-move-box { background: rgba(239, 68, 68, 0.25); padding: 4px 10px; border-radius: 6px; color: var(--danger); font-weight: 900; border: 2px solid var(--danger); display: inline-block; margin-top: 5px; }
+
+        @keyframes flashRed {
+            0% { background: radial-gradient(circle at center, #ef4444 0%, #020617 100%) !important; }
+            100% { background: inherit; }
+        }
+        .flash-red { animation: flashRed 0.3s ease-out; }
+        
+        #game-stats {
+            display: none; justify-content: space-around; font-family: 'JetBrains Mono'; margin-top: 15px; font-size: 15px; color: var(--success); font-weight: bold; background: rgba(16, 185, 129, 0.1); padding: 10px; border-radius: 8px; border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div id="viewport">
+        <div id="large-move">--</div>
+        
+        <!-- Top Left: Modes -->
+        <div class="glass-panel top-left">
+            <button id="modePractice" class="mode-btn">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+                PRACTICE
+            </button>
+            <button id="modeComp" class="mode-btn active">
+                <svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+                COMPETE
+            </button>
+            <button id="modeLearn" class="mode-btn">
+                <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                LEARN ALGS
+            </button>
+            <button id="modeTrainer" class="mode-btn">
+                <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                SMART TRAINER
+            </button>
+            <button id="modeGames" class="mode-btn">
+                <svg viewBox="0 0 24 24"><line x1="6" x2="10" y1="12" y2="12"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="15" x2="15.01" y1="13" y2="13"/><line x1="18" x2="18.01" y1="11" y2="11"/><rect width="20" height="12" x="2" y="6" rx="2"/></svg>
+                GAMES
+            </button>
+        </div>
+
+        <!-- Front Center Secondary: Learn Controls (NEW) -->
+        <div id="learn-controls" class="glass-panel controls-panel">
+            <div style="color:var(--success); font-weight:800; font-size:14px; margin-bottom:10px; text-transform:uppercase; text-align:center;">Manual Learning & Testing</div>
+            <select id="learnAlgSelect" style="font-size: 13px; font-weight: bold;"></select>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="btnLearnStep" class="btn" style="flex: 1; background:var(--success); font-size: 11px;">STEP-BY-STEP</button>
+                <button id="btnLearnSpeed" class="btn" style="flex: 1; background:var(--warning); font-size: 11px; color: black;">SPEED TEST</button>
+            </div>
+        </div>
+
+        <!-- Front Center Secondary: Smart Trainer Controls -->
+        <div id="trainer-controls" class="glass-panel controls-panel">
+            <div style="color:var(--trainer); font-weight:800; font-size:14px; margin-bottom:10px; text-transform:uppercase; text-align:center;">Smart Cube Training</div>
+            <select id="algSelect" style="font-size: 13px; font-weight: bold;"></select>
+            <button id="startAlg" class="btn" style="width:100%; background:var(--trainer);">START ALGORITHM</button>
+        </div>
+
+        <!-- Front Center Secondary: Games Controls -->
+        <div id="game-controls" class="glass-panel controls-panel">
+            <div style="color:var(--games); font-weight:800; font-size:14px; margin-bottom:10px; text-transform:uppercase; text-align:center;">Arcade Challenges</div>
+            <select id="gameSelect" style="font-size: 13px; font-weight: bold;">
+                <option value="defusal">💣 Bomb Defusal</option>
+                <option value="simon">🧠 Simon Says</option>
+                <option value="smash">🎨 Color Smash</option>
+            </select>
+            <button id="startGameBtn" class="btn" style="width:100%; background:var(--games);">START GAME</button>
+            <div id="game-stats">
+                <span id="game-score">Score: 0</span>
+                <span id="game-target">/ 5</span>
+            </div>
+        </div>
+
+        <!-- Top Right: Connection & Battery -->
+        <div class="glass-panel top-right">
+            <input type="text" id="macInput" placeholder="MAC: D4:36...">
+            <button id="connectBtn" class="btn" style="width:100%">LINK CUBE</button>
+            <div id="status" style="font-size: 10px; text-align: center; margin-top: 8px; opacity: 0.6;">CUBE DISCONNECTED</div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);">
+                <span style="font-size: 10px; opacity: 0.5;">BATTERY</span>
+                <span id="battery" style="font-family: 'JetBrains Mono'; font-weight: 800; color: var(--success);">--%</span>
+            </div>
+        </div>
+
+        <!-- MANUAL INPUT PANEL -->
+        <div class="glass-panel" style="position: absolute; top: 145px; right: 15px; width: 220px; padding: 12px; z-index: 50;">
+            <div style="font-size: 10px; opacity: 0.5; margin-bottom: 8px; font-weight: bold;">MANUAL VIRTUAL INPUT</div>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="manualInput" placeholder="e.g. R U R'" style="margin: 0; flex: 1; text-transform: uppercase;">
+                <button id="manualSubmit" class="btn" style="padding: 8px 12px;">GO</button>
+            </div>
+        </div>
+
+        <!-- Right Side: Vertical Toolbar -->
+        <div class="glass-panel right-toolbar">
+            <button id="genScramble" class="btn icon-btn" title="Generate Scramble">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+            </button>
+            
+            <div style="height: 1px; background: var(--border); width: 100%; margin: 5px 0;"></div>
+            
+            <button id="resetCube" class="btn btn-outline icon-btn" title="Reset UI">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+            </button>
+            <button id="autoView" class="btn btn-outline icon-btn" title="Auto-Rotate View">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            </button>
+            <button id="centerView" class="btn btn-outline icon-btn" title="Center View">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+            </button>
+        </div>
+
+        <div class="timer-center">
+            <div id="main-timer">00:00.00</div>
+            
+            <div id="sequence-wrapper" style="display:none;">
+                <div id="sequence-display"></div>
+                <div id="sequence-translation"></div>
+            </div>
+        </div>
+
+        <div id="instruction">HOLD CUBE: WHITE ON TOP, GREEN IN FRONT</div>
+
+        <div id="canvas-container" style="width:100%; height:100%"></div>
+    </div>
+
+    <!-- Dock -->
+    <div id="ui-bottom">
+        <div id="history" class="history-rail"></div>
+        <button id="clearHistory" class="btn btn-outline" style="white-space:nowrap; padding: 10px 16px;">Clear Log</button>
+        
+        <div class="social-dock">
+            <a href="https://github.com/Abilash-Nickal" target="_blank" class="glass social-btn" title="GitHub">
+                <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+            </a>
+            <a href="https://www.linkedin.com/in/arumugam-abilashan-6916a2157/" target="_blank" class="glass social-btn" title="LinkedIn">
+                <svg viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.238 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+            </a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { BTCube } from 'https://esm.sh/gan-i3-356-bluetooth@latest';
+
+        // ==========================================
+        // MODULE: CFOP ALGORITHMS DICTIONARY
+        // ==========================================
+        const CFOP_ALGORITHMS = {
+            "OLL (Orientation)": [
+                { name: "OLL 21 (Sune)", alg: "R U R' U R U2 R'" },
+                { name: "OLL 22 (Anti-Sune)", alg: "R U2 R' U' R U' R'" },
+                { name: "OLL 23 (Headlights)", alg: "R2 D R' U2 R D' R' U2 R'" },
+                { name: "OLL 28 (Line)", alg: "F R U R' U' F'" },
+                { name: "OLL 45 (T-Shape)", alg: "F R U R' U' F'" },
+                { name: "OLL 57 (Cross)", alg: "R U R' U' M' U R U' r'" } 
+            ],
+            "PLL (Permutation)": [
+                { name: "T Perm", alg: "R U R' U' R' F R2 U' R' U' R U R' F'" },
+                { name: "Y Perm", alg: "F R U' R' U' R U R' F' R U R' U' R' F R F'" },
+                { name: "Jb Perm", alg: "R U R' F' R U R' U' R' F R2 U' R'" },
+                { name: "Ja Perm", alg: "R' U L' U2 R U' R' U2 R L" },
+                { name: "Ua Perm", alg: "R U' R U R U R U' R' U' R2" },
+                { name: "Ub Perm", alg: "R2 U R U R' U' R' U' R' U R'" },
+                { name: "H Perm (Cols)", alg: "M2 U M2 U2 M2 U M2" }
+            ]
+        };
+
+        const algSelect = document.getElementById('algSelect');
+        const learnAlgSelect = document.getElementById('learnAlgSelect'); // New Learn Select
+        
+        for (const [category, algs] of Object.entries(CFOP_ALGORITHMS)) {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = category;
+            
+            const optgroupLearn = document.createElement('optgroup');
+            optgroupLearn.label = category;
+
+            algs.forEach(algData => {
+                const option = document.createElement('option');
+                option.value = algData.alg;
+                option.textContent = `${algData.name}`;
+                
+                const optionLearn = document.createElement('option');
+                optionLearn.value = algData.alg;
+                optionLearn.textContent = `${algData.name}`;
+
+                optgroup.appendChild(option);
+                optgroupLearn.appendChild(optionLearn);
+            });
+            algSelect.appendChild(optgroup);
+            learnAlgSelect.appendChild(optgroupLearn);
+        }
+
+        // ==========================================
+        // MODULE: CONSTANTS & GLOBALS
+        // ==========================================
+        const STICKER_COLORS = {
+            U: '#F3F3F3', D: '#F5B400', L: '#E87000', R: '#DC422F', F: '#009D54', B: '#3D81F6', CORE: '#050505'
+        };
+        const FACES = ['U','D','L','R','F','B'];
+        
+        let currentMode = 'comp'; 
+        let timerState = 'idle'; // idle, sequence, inspection, running, finished, game, learn_step, learn_speed_ready, learn_speed_running
+        let startTime = 0, timerInterval = null, inspectionInterval = null, inspectionCountdown = 15;
+        
+        let targetSequence = []; 
+        let sequenceIndex = 0;
+        let wrongMoves = [];
+
+        let cubePieces = [], isAnimating = false, autoRotate = false, moveQueue = [];
+
+        // --- GAME STATE VARIABLES ---
+        let activeGame = null; // 'defusal', 'simon', 'smash'
+        let gameTimerMs = 0;
+        let gameScore = 0;
+        let gameTarget = 0;
+        let gameLoop = null;
+        let simonSequence = [];
+        let isSimonStepping = false;
+
+        // ==========================================
+        // MODULE: EFFECTS & TEXTURES
+        // ==========================================
+        function createStickerTexture(color, isLogo = false) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            ctx.fillStyle = STICKER_COLORS.CORE;
+            ctx.fillRect(0, 0, 512, 512);
+
+            ctx.fillStyle = color;
+            const x = 20, y = 20, w = 472, h = 472, r = 50; 
+            ctx.beginPath();
+            ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+            ctx.fill();
+
+            const texture = new THREE.CanvasTexture(canvas);
+
+            if (isLogo) {
+                const img = new Image();
+                img.crossOrigin = "Anonymous"; 
+                img.onload = () => {
+                    const imgSize = 400; 
+                    const offset = (512 - imgSize) / 2; 
+                    ctx.drawImage(img, offset, offset, imgSize, imgSize);
+                    texture.needsUpdate = true; 
+                };
+                img.src = 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/React-icon.svg/250px-React-icon.svg.png';
+            }
+
+            texture.anisotropy = 16;
+            return texture;
+        }
+
+        const MAT_U = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.U) });
+        const MAT_U_LOGO = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.U, true) });
+        const MAT_D = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.D) });
+        const MAT_L = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.L) });
+        const MAT_R = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.R) });
+        const MAT_F = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.F) });
+        const MAT_B = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.B) });
+        const MAT_CORE = new THREE.MeshLambertMaterial({ color: STICKER_COLORS.CORE });
+
+        // ==========================================
+        // MODULE: CUBE (THREE.JS)
+        // ==========================================
+        const scene = new THREE.Scene();
+        const container = document.getElementById('canvas-container');
+        const camera = new THREE.PerspectiveCamera(35, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirLight.position.set(5, 5, 5);
+        scene.add(dirLight);
+        camera.position.set(7, 6, 11);
+        camera.lookAt(0,0,0);
+
+        // Holographic Group Layer
+        const ghostGroup = new THREE.Group();
+        scene.add(ghostGroup);
+        let ghostAxis = null, ghostTargetAngle = 0, ghostTimer = 0;
+
+        function initCube() {
+            cubePieces.forEach(p => scene.remove(p));
+            cubePieces = [];
+            ghostGroup.clear();
+            ghostAxis = null;
+
+            for(let x=-1; x<=1; x++) {
+                for(let y=-1; y<=1; y++) {
+                    for(let z=-1; z<=1; z++) {
+                        if(x===0 && y===0 && z===0) continue;
+                        const mats = [
+                            x === 1 ? MAT_R : MAT_CORE,
+                            x === -1 ? MAT_L : MAT_CORE,
+                            y === 1 ? (x===0 && z===0 ? MAT_U_LOGO : MAT_U) : MAT_CORE,
+                            y === -1 ? MAT_D : MAT_CORE,
+                            z === 1 ? MAT_F : MAT_CORE,
+                            z === -1 ? MAT_B : MAT_CORE,
+                        ];
+                        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.96, 0.96), mats);
+                        mesh.position.set(x, y, z);
+                        mesh.userData.home = new THREE.Vector3(x, y, z);
+                        scene.add(mesh);
+                        cubePieces.push(mesh);
+                    }
+                }
+            }
+        }
+
+        function animateMove(moveStr, duration = 80) {
+            if (isAnimating) { moveQueue.push({moveStr, duration}); return; }
+            isAnimating = true;
+            
+            const face = moveStr[0], isPrime = moveStr.includes("'"), isDouble = moveStr.includes("2");
+            let axis, val, dir = 1;
+            
+            if (face === 'M') { axis='x'; val=0; dir=1; }
+            else {
+                switch(face) {
+                    case 'U': axis='y'; val=1;  dir=-1; break;
+                    case 'D': axis='y'; val=-1; dir=1;  break;
+                    case 'L': axis='x'; val=-1; dir=1;  break;
+                    case 'R': axis='x'; val=1;  dir=-1; break;
+                    case 'F': axis='z'; val=1;  dir=-1; break;
+                    case 'B': axis='z'; val=-1; dir=1;  break;
+                }
+            }
+            
+            const group = new THREE.Group();
+            scene.add(group);
+            
+            const pLight = new THREE.PointLight(0xffffff, 3, 15);
+            group.add(pLight);
+            
+            const pos = new THREE.Vector3();
+            const targets = cubePieces.filter(p => { p.getWorldPosition(pos); return Math.round(pos[axis]) === val; });
+            targets.forEach(p => group.attach(p));
+            
+            let angle = (Math.PI/2) * dir;
+            if(isPrime) angle *= -1; if(isDouble) angle *= 2;
+
+            const start = performance.now();
+            function step() {
+                const now = performance.now();
+                const progress = Math.min((now - start) / duration, 1);
+                
+                group.rotation[axis] = angle * (1 - Math.pow(1 - progress, 4)); 
+                pLight.intensity = 3 * (1 - progress); 
+                
+                if(progress < 1) requestAnimationFrame(step);
+                else {
+                    group.updateMatrixWorld();
+                    targets.forEach(p => {
+                        scene.attach(p);
+                        p.position.x = Math.round(p.position.x);
+                        p.position.y = Math.round(p.position.y);
+                        p.position.z = Math.round(p.position.z);
+                        p.rotation.x = Math.round(p.rotation.x/(Math.PI/2))*(Math.PI/2);
+                        p.rotation.y = Math.round(p.rotation.y/(Math.PI/2))*(Math.PI/2);
+                        p.rotation.z = Math.round(p.rotation.z/(Math.PI/2))*(Math.PI/2);
+                        p.updateMatrix();
+                    });
+                    scene.remove(group);
+                    isAnimating = false;
+                    
+                    if(moveQueue.length > 0) { 
+                        const n = moveQueue.shift(); animateMove(n.moveStr, n.duration); 
+                    }
+                }
+            }
+            step();
+        }
+
+        // --- GLOWING NEON LAMP EFFECT ---
+        function buildGhostHint(moveStr, colorHex) {
+            ghostGroup.clear();
+            if (!moveStr) { ghostAxis = null; return; }
+
+            const face = moveStr[0], isPrime = moveStr.includes("'"), isDouble = moveStr.includes("2");
+            let axis, val, dir = 1;
+            
+            if (face === 'M') { axis='x'; val=0; dir=1; }
+            else {
+                switch(face) {
+                    case 'U': axis='y'; val=1;  dir=-1; break;
+                    case 'D': axis='y'; val=-1; dir=1;  break;
+                    case 'L': axis='x'; val=-1; dir=1;  break;
+                    case 'R': axis='x'; val=1;  dir=-1; break;
+                    case 'F': axis='z'; val=1;  dir=-1; break;
+                    case 'B': axis='z'; val=-1; dir=1;  break;
+                }
+            }
+
+            let faceGeo;
+            if (axis === 'x') faceGeo = new THREE.BoxGeometry(1.05, 3.05, 3.05);
+            if (axis === 'y') faceGeo = new THREE.BoxGeometry(3.05, 1.05, 3.05);
+            if (axis === 'z') faceGeo = new THREE.BoxGeometry(3.05, 3.05, 1.05);
+
+            const faceMat = new THREE.MeshBasicMaterial({ 
+                color: colorHex,  opacity: 100,
+                blending: THREE.AdditiveBlending, depthWrite: false
+            });
+            const faceGlow = new THREE.Mesh(faceGeo, faceMat);
+            
+            if (axis === 'x') faceGlow.position.set(val, 0, 0);
+            if (axis === 'y') faceGlow.position.set(0, val, 0);
+            if (axis === 'z') faceGlow.position.set(0, 0, val);
+            
+            faceGlow.userData.isFaceGlow = true;
+            ghostGroup.add(faceGlow);
+
+            if (face !== 'M') {
+                const lampLight = new THREE.PointLight(colorHex, 0.1, 0.1); 
+                const lightDist = 0.1; 
+                if (axis === 'x') lampLight.position.set(val * lightDist, 0, 0);
+                if (axis === 'y') lampLight.position.set(0, val * lightDist, 0);
+                if (axis === 'z') lampLight.position.set(0, 0, val * lightDist);
+                lampLight.userData.isLampLight = true;
+                ghostGroup.add(lampLight);
+            }
+
+            const radius = 2.5, tube = 0.09;
+            const arcLength = isDouble ? Math.PI * 1.5 : Math.PI * 0.8;
+            const arrowMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: false, opacity: 0.2, side: THREE.DoubleSide });
+
+            const torus = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 12, 48, arcLength), arrowMat);
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(tube * 3, tube * 6, 16), arrowMat);
+            const coneGroup = new THREE.Group();
+            cone.position.set(radius, 0, 0); coneGroup.add(cone); coneGroup.rotation.z = arcLength; 
+
+            const arrowGroup = new THREE.Group();
+            arrowGroup.add(torus); arrowGroup.add(coneGroup);
+            arrowGroup.userData.baseRotZ = -arcLength / 2;
+            arrowGroup.rotation.z = arrowGroup.userData.baseRotZ;
+
+            if (!isPrime) arrowGroup.scale.x = -1; 
+
+            const pivotGroup = new THREE.Group();
+            pivotGroup.add(arrowGroup);
+            
+            const hoverDist = 1;
+            if (face === 'M') {
+                pivotGroup.position.x = 0; pivotGroup.rotation.y = -Math.PI / 2;
+            } else {
+                switch(face) {
+                    case 'U': pivotGroup.position.y = hoverDist; pivotGroup.rotation.x = -Math.PI / 2; break;
+                    case 'D': pivotGroup.position.y = -hoverDist; pivotGroup.rotation.x = Math.PI / 2; break;
+                    case 'L': pivotGroup.position.x = -hoverDist; pivotGroup.rotation.y = -Math.PI / 2; break;
+                    case 'R': pivotGroup.position.x = hoverDist; pivotGroup.rotation.y = Math.PI / 2; break;
+                    case 'F': pivotGroup.position.z = hoverDist; break; 
+                    case 'B': pivotGroup.position.z = -hoverDist; pivotGroup.rotation.y = Math.PI; break;
+                }
+            }
+
+            pivotGroup.userData.isArrowPivot = true;
+            ghostGroup.add(pivotGroup);
+
+            ghostTargetAngle = (Math.PI / 2) * dir;
+            if (isPrime) ghostTargetAngle *= -1;
+            if (isDouble) ghostTargetAngle *= 2;
+            
+            ghostAxis = axis;
+            ghostTimer = 0;
+        }
+
+        // ==========================================
+        // MODULE: UI & STATE MANAGEMENT
+        // ==========================================
+        function translateMove(move) {
+            const tr = {
+                "U": "Top Face (White) Clockwise (Left)", "U'": "Top Face (White) Counter-Clockwise (Right)", "U2": "Top Face (White) Double Turn",
+                "D": "Bottom Face (Yellow) Clockwise (Right)", "D'": "Bottom Face (Yellow) Counter-Clockwise (Left)", "D2": "Bottom Face (Yellow) Double Turn",
+                "R": "Right Face (Red) Clockwise (Up)", "R'": "Right Face (Red) Counter-Clockwise (Down)", "R2": "Right Face (Red) Double Turn",
+                "L": "Left Face (Orange) Clockwise (Down)", "L'": "Left Face (Orange) Counter-Clockwise (Up)", "L2": "Left Face (Orange) Double Turn",
+                "F": "Front Face (Green) Clockwise (Right)", "F'": "Front Face (Green) Counter-Clockwise (Left)", "F2": "Front Face (Green) Double Turn",
+                "B": "Back Face (Blue) Clockwise (Left)", "B'": "Back Face (Blue) Counter-Clockwise (Right)", "B2": "Back Face (Blue) Double Turn",
+                "M": "Middle Slice Down", "M'": "Middle Slice Up", "M2": "Middle Slice Double Turn"
+            };
+            return tr[move] || move;
+        }
+
+        function generateValidScramble(length = 20) {
+            const mods = ['', "'", '2'];
+            let sc = [], lastFace = -1;
+            for(let i=0; i<length; i++) {
+                let f; do { f = Math.floor(Math.random() * 6); } while (f === lastFace);
+                lastFace = f; sc.push(FACES[f] + mods[Math.floor(Math.random() * 3)]);
+            }
+            return sc;
+        }
+
+        function reverseMove(m) {
+            if (m.endsWith("2")) return m; 
+            if (m.endsWith("'")) return m[0]; 
+            return m + "'"; 
+        }
+
+        function updateSequenceUI() {
+            const wrapper = document.getElementById('sequence-wrapper');
+            const display = document.getElementById('sequence-display');
+            const translation = document.getElementById('sequence-translation');
+            
+            // Only handle states that utilize the ghost hint / standard tracking mechanism
+            if (timerState !== 'sequence' && timerState !== 'game' && timerState !== 'learn_step') {
+                ghostGroup.clear(); ghostAxis = null;
+                // Only hide wrapper if it's the standard solving mode
+                if (timerState === 'running') wrapper.style.display = "none";
+                return;
+            }
+
+            wrapper.style.display = "inline-block";
+            let html = '';
+            
+            for(let i=0; i < sequenceIndex; i++) html += `<span style="color: #475569; margin-right: 8px;">${targetSequence[i]}</span>`;
+            
+            let expectedMove = "";
+            let hintColor = 0x10b981; 
+            
+            if (wrongMoves.length > 0) {
+                expectedMove = reverseMove(wrongMoves[wrongMoves.length - 1]);
+                hintColor = 0xef4444; 
+                html += `<span style="color: var(--danger); font-size: 32px; font-weight: 900; margin-right: 8px; text-decoration: underline;">${expectedMove}</span>`;
+                translation.innerHTML = `⚠️ MISTAKE! To fix, perform:<br/><span class="wrong-move-box">${translateMove(expectedMove)}</span>`;
+                translation.style.color = "var(--danger)"; translation.style.background = "transparent";
+            } else if (sequenceIndex < targetSequence.length) {
+                expectedMove = targetSequence[sequenceIndex];
+                html += `<span style="color: var(--warning); font-size: 32px; font-weight: 900; margin-right: 8px; text-decoration: underline;">${expectedMove}</span>`;
+                translation.innerText = translateMove(expectedMove);
+                translation.style.color = "var(--accent)"; translation.style.background = "rgba(59, 130, 246, 0.15)";
+                
+                if(currentMode === 'games') {
+                    translation.style.color = "var(--games)"; 
+                    translation.style.background = "rgba(244, 63, 94, 0.15)";
+                    hintColor = 0xf43f5e;
+                }
+            }
+
+            for(let i=sequenceIndex + 1; i < targetSequence.length; i++) html += `<span style="color: white; margin-right: 8px;">${targetSequence[i]}</span>`;
+            display.innerHTML = html;
+            
+            if (expectedMove) buildGhostHint(expectedMove, hintColor);
+            else ghostGroup.clear();
+        }
+
+        function startInspection() {
+            timerState = 'inspection';
+            updateSequenceUI(); 
+            inspectionCountdown = 15;
+            document.getElementById('instruction').innerText = "INSPECTION (MAKE ANY TURN TO START TIMER)";
+            document.getElementById('instruction').style.color = "white";
+            document.getElementById('instruction').style.borderColor = "var(--border)";
+            
+            const wrapper = document.getElementById('sequence-wrapper');
+            wrapper.style.display = "inline-block";
+            document.getElementById('sequence-display').innerHTML = `<span style="color:var(--success); font-size: 26px; font-weight: bold;">SCRAMBLE COMPLETE!</span>`;
+            document.getElementById('sequence-translation').innerText = "Inspect your cube.";
+            
+            document.getElementById('main-timer').innerText = "15";
+            document.getElementById('main-timer').style.color = "var(--danger)";
+            
+            inspectionInterval = setInterval(() => {
+                inspectionCountdown--;
+                if (inspectionCountdown > 0) document.getElementById('main-timer').innerText = inspectionCountdown.toString();
+                else { clearInterval(inspectionInterval); startSolvingTimer(); }
+            }, 1000);
+        }
+
+        function completeTrainer() {
+            timerState = 'finished';
+            updateSequenceUI(); 
+            
+            document.getElementById('instruction').innerText = "ALGORITHM COMPLETE! READY TO TRAIN AGAIN.";
+            document.getElementById('instruction').style.color = "var(--success)";
+            document.getElementById('instruction').style.borderColor = "var(--success)";
+            
+            const display = document.getElementById('sequence-display');
+            display.style.display = "inline-block";
+            display.innerHTML = `<span style="color:var(--success); font-size: 26px; font-weight: bold;">GREAT JOB!</span>`;
+            document.getElementById('sequence-translation').innerText = "Resets in 2 seconds...";
+            
+            setTimeout(() => {
+                if (currentMode === 'trainer' && timerState === 'finished') {
+                    startAlgTrainer();
+                }
+            }, 2000);
+        }
+
+        function formatTime(ms) {
+            if(ms < 0) ms = 0;
+            const m = Math.floor(ms/60000);
+            const s = Math.floor((ms%60000)/1000);
+            const c = Math.floor((ms%1000)/10);
+            return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${c.toString().padStart(2,'0')}`;
+        }
+        function formatGameTime(ms) {
+            if(ms < 0) ms = 0;
+            const s = Math.floor(ms/1000);
+            const c = Math.floor((ms%1000)/10);
+            return `${s.toString().padStart(2,'0')}.${c.toString().padStart(2,'0')}`;
+        }
+
+        // Modified timer function to support Speed Test Mode where sequence is not hidden
+        function startSolvingTimer(hideSequence = true) {
+            if (inspectionInterval) clearInterval(inspectionInterval);
+            timerState = hideSequence ? 'running' : 'learn_speed_running';
+            startTime = performance.now();
+            document.getElementById('main-timer').style.color = "white"; 
+            document.getElementById('instruction').innerText = hideSequence ? "SOLVING... (PRESS SPACEBAR WHEN SOLVED)" : "SPEED TEST... (EXECUTE ALG AND PRESS SPACE TO STOP)";
+            if(hideSequence) document.getElementById('sequence-wrapper').style.display = "none";
+            
+            timerInterval = setInterval(() => {
+                document.getElementById('main-timer').innerText = formatTime(performance.now() - startTime);
+            }, 10);
+        }
+
+        function stopTimer() {
+            if (timerState !== 'running' && timerState !== 'learn_speed_running') return;
+            clearInterval(timerInterval);
+            timerState = 'finished';
+            document.getElementById('instruction').innerText = "COMPLETE!";
+            document.getElementById('instruction').style.color = "var(--success)";
+            document.getElementById('instruction').style.borderColor = "var(--success)";
+            document.getElementById('main-timer').style.color = "var(--success)";
+        }
+
+        function clearAllIntervals() {
+            clearInterval(timerInterval);
+            clearInterval(inspectionInterval);
+            clearInterval(gameLoop);
+        }
+
+        // ==========================================
+        // MODULE: ARCADE GAMES
+        // ==========================================
+
+        function initBombDefusal() {
+            activeGame = 'defusal';
+            gameTimerMs = 60000; // 60 seconds
+            gameScore = 0;
+            gameTarget = 5;
+            updateGameStats();
+            
+            const algs = CFOP_ALGORITHMS["PLL (Permutation)"];
+            targetSequence = algs[Math.floor(Math.random()*algs.length)].alg.split(/\s+/);
+            sequenceIndex = 0; wrongMoves = [];
+            timerState = 'game';
+            
+            document.getElementById('instruction').innerText = "DEFUSE THE BOMB! FINISH 5 ALGS QUICKLY";
+            document.getElementById('instruction').style.color = "var(--games)";
+            document.getElementById('instruction').style.borderColor = "var(--games)";
+            updateSequenceUI();
+
+            gameLoop = setInterval(() => {
+                gameTimerMs -= 10;
+                if(gameTimerMs <= 0) {
+                    gameTimerMs = 0;
+                    endGame(false, "BOOM! TIME RAN OUT.");
+                }
+                document.getElementById('main-timer').innerText = formatGameTime(gameTimerMs);
+            }, 10);
+        }
+
+        function initSimonSays() {
+            activeGame = 'simon';
+            gameScore = 0;
+            updateGameStats();
+            timerState = 'game';
+            targetSequence = []; wrongMoves = [];
+            document.getElementById('sequence-wrapper').style.display = "none";
+            
+            simonSequence = [FACES[Math.floor(Math.random()*6)]];
+            playSimonSequence();
+        }
+
+        function playSimonSequence() {
+            isSimonStepping = true;
+            sequenceIndex = 0;
+            targetSequence = [...simonSequence];
+            
+            document.getElementById('instruction').innerText = "MEMORIZE THE PATTERN...";
+            document.getElementById('instruction').style.color = "var(--warning)";
+            document.getElementById('instruction').style.borderColor = "var(--warning)";
+            document.getElementById('main-timer').innerText = "LEVEL " + simonSequence.length;
+            document.getElementById('main-timer').style.color = "white";
+
+            let step = 0;
+            const simonInterval = setInterval(() => {
+                animateMove(simonSequence[step]);
+                document.getElementById('main-timer').innerText = simonSequence[step];
+                
+                step++;
+                if (step >= simonSequence.length) {
+                    clearInterval(simonInterval);
+                    setTimeout(() => {
+                        isSimonStepping = false;
+                        document.getElementById('instruction').innerText = "YOUR TURN! REPEAT THE SEQUENCE";
+                        document.getElementById('instruction').style.color = "var(--success)";
+                        document.getElementById('instruction').style.borderColor = "var(--success)";
+                        document.getElementById('main-timer').innerText = "GO!";
+                        updateSequenceUI(); 
+                    }, 800);
+                }
+            }, 1000);
+        }
+
+        function initColorSmash() {
+            activeGame = 'smash';
+            gameTimerMs = 120000; // 2 minutes
+            gameScore = 0;
+            gameTarget = '∞';
+            updateGameStats();
+            timerState = 'game';
+
+            setupSmashPattern();
+
+            document.getElementById('instruction').innerText = "SMASH THE PATTERNS AS FAST AS POSSIBLE";
+            document.getElementById('instruction').style.color = "var(--games)";
+            document.getElementById('instruction').style.borderColor = "var(--games)";
+
+            gameLoop = setInterval(() => {
+                gameTimerMs -= 10;
+                if(gameTimerMs <= 0) {
+                    gameTimerMs = 0;
+                    endGame(true, "TIME'S UP! FINAL SCORE: " + gameScore);
+                }
+                document.getElementById('main-timer').innerText = formatTime(gameTimerMs);
+            }, 10);
+        }
+
+        function setupSmashPattern() {
+            const length = Math.min(4 + Math.floor(gameScore / 2), 8); // Gets harder
+            targetSequence = generateValidScramble(length);
+            sequenceIndex = 0; wrongMoves = [];
+            updateSequenceUI();
+        }
+
+        function endGame(win, msg) {
+            clearAllIntervals();
+            timerState = 'finished';
+            activeGame = null;
+            ghostGroup.clear(); ghostAxis = null;
+            
+            document.getElementById('instruction').innerText = msg;
+            document.getElementById('instruction').style.color = win ? "var(--success)" : "var(--danger)";
+            document.getElementById('instruction').style.borderColor = win ? "var(--success)" : "var(--danger)";
+            document.getElementById('main-timer').style.color = win ? "var(--success)" : "var(--danger)";
+            document.getElementById('sequence-wrapper').style.display = "none";
+        }
+
+        function updateGameStats() {
+            document.getElementById('game-score').innerText = `Score: ${gameScore}`;
+            document.getElementById('game-target').innerText = `/ ${gameTarget}`;
+        }
+
+        function triggerRedFlash() {
+            const vp = document.getElementById('viewport');
+            vp.classList.add('flash-red');
+            document.getElementById('main-timer').style.transform = "scale(1.1)";
+            document.getElementById('main-timer').style.color = "var(--danger)";
+            setTimeout(() => {
+                vp.classList.remove('flash-red');
+                document.getElementById('main-timer').style.transform = "scale(1)";
+                document.getElementById('main-timer').style.color = "white";
+            }, 300);
+        }
+
+        // ==========================================
+        // MODULE: CORE MOVE PROCESSING ENGINE
+        // ==========================================
+        function processMove(move) {
+            document.getElementById('large-move').innerText = move;
+            animateMove(move);
+
+            const pill = document.createElement('div');
+            pill.className = 'move-pill'; pill.innerText = move;
+            const h = document.getElementById('history');
+            h.appendChild(pill); 
+            h.scrollTo({ left: h.scrollWidth, behavior: 'smooth' });
+
+            // ARCADE GAME LOGIC
+            if (currentMode === 'games' && activeGame) {
+                if(activeGame === 'defusal') {
+                    if (wrongMoves.length > 0) {
+                        const expectedUndo = reverseMove(wrongMoves[wrongMoves.length - 1]);
+                        if (move === expectedUndo) wrongMoves.pop(); 
+                        else if (expectedUndo.endsWith('2') && move[0] === expectedUndo[0] && !move.endsWith('2')) wrongMoves[wrongMoves.length - 1] = move; 
+                        else { wrongMoves.push(move); triggerRedFlash(); gameTimerMs -= 5000; }
+                    } else {
+                        const target = targetSequence[sequenceIndex];
+                        if (move === target) {
+                            sequenceIndex++;
+                            if (sequenceIndex >= targetSequence.length) {
+                                gameScore++; updateGameStats();
+                                if (gameScore >= 5) {
+                                    endGame(true, "BOMB DEFUSED! YOU SAVED THE DAY!");
+                                } else {
+                                    const algs = CFOP_ALGORITHMS["PLL (Permutation)"];
+                                    targetSequence = algs[Math.floor(Math.random()*algs.length)].alg.split(/\s+/);
+                                    sequenceIndex = 0; 
+                                }
+                            }
+                        } else if (target.endsWith('2') && move[0] === target[0] && !move.endsWith('2')) {
+                            targetSequence[sequenceIndex] = move;
+                        } else { wrongMoves.push(move); triggerRedFlash(); gameTimerMs -= 5000; }
+                    }
+                    updateSequenceUI();
+                    return;
+                }
+
+                if(activeGame === 'simon') {
+                    if(isSimonStepping) return; 
+                    
+                    const target = targetSequence[sequenceIndex];
+                    if (move === target) {
+                        sequenceIndex++;
+                        document.getElementById('main-timer').innerText = "GOOD!";
+                        if (sequenceIndex >= targetSequence.length) {
+                            gameScore++; updateGameStats();
+                            simonSequence.push(FACES[Math.floor(Math.random()*6)]);
+                            playSimonSequence();
+                        } else {
+                            updateSequenceUI();
+                        }
+                    } else if (target.endsWith('2') && move[0] === target[0] && !move.endsWith('2')) {
+                        targetSequence[sequenceIndex] = move;
+                    } else {
+                        endGame(false, "WRONG MOVE! GAME OVER. FINAL SCORE: " + gameScore);
+                    }
+                    return;
+                }
+
+                if(activeGame === 'smash') {
+                    if (wrongMoves.length > 0) {
+                        const expectedUndo = reverseMove(wrongMoves[wrongMoves.length - 1]);
+                        if (move === expectedUndo) wrongMoves.pop(); 
+                        else if (expectedUndo.endsWith('2') && move[0] === expectedUndo[0] && !move.endsWith('2')) wrongMoves[wrongMoves.length - 1] = move; 
+                        else { wrongMoves.push(move); triggerRedFlash(); }
+                    } else {
+                        const target = targetSequence[sequenceIndex];
+                        if (move === target) {
+                            sequenceIndex++;
+                            if (sequenceIndex >= targetSequence.length) {
+                                gameScore++; updateGameStats();
+                                setupSmashPattern();
+                            }
+                        } else if (target.endsWith('2') && move[0] === target[0] && !move.endsWith('2')) {
+                            targetSequence[sequenceIndex] = move;
+                        } else { wrongMoves.push(move); triggerRedFlash(); }
+                    }
+                    updateSequenceUI();
+                    return;
+                }
+            }
+
+            // STANDARD SEQUENCE LOGIC (Smart Trainer)
+            if (timerState === 'sequence') {
+                if (wrongMoves.length > 0) {
+                    const expectedUndo = reverseMove(wrongMoves[wrongMoves.length - 1]);
+                    if (move === expectedUndo) wrongMoves.pop(); 
+                    else if (expectedUndo.endsWith('2') && move[0] === expectedUndo[0] && !move.endsWith('2')) wrongMoves[wrongMoves.length - 1] = move; 
+                    else wrongMoves.push(move); 
+                } else {
+                    const target = targetSequence[sequenceIndex];
+                    if (move === target) {
+                        sequenceIndex++;
+                        if (sequenceIndex >= targetSequence.length) {
+                            if (currentMode === 'comp') startInspection();
+                            else if (currentMode === 'trainer') completeTrainer();
+                        }
+                    } else if (target.endsWith('2') && move[0] === target[0] && !move.endsWith('2')) {
+                        targetSequence[sequenceIndex] = move;
+                    }
+                    else wrongMoves.push(move); 
+                }
+                updateSequenceUI();
+            } 
+            else if (timerState === 'inspection') startSolvingTimer();
+            else if (currentMode === 'practice' && (timerState === 'idle' || timerState === 'finished')) {
+                clearInterval(timerInterval);
+                document.getElementById('sequence-wrapper').style.display = "none";
+                startSolvingTimer();
+            }
+        }
+
+
+        // --- UI BUTTON HANDLERS ---
+        document.getElementById('genScramble').onclick = () => {
+            initCube();
+            targetSequence = generateValidScramble();
+            sequenceIndex = 0; wrongMoves = [];
+            timerState = 'sequence';
+            document.getElementById('main-timer').innerText = "00:00.00";
+            document.getElementById('main-timer').style.color = "white";
+            
+            document.getElementById('instruction').innerText = "HOLD CUBE: WHITE ON TOP, GREEN IN FRONT";
+            document.getElementById('instruction').style.color = "var(--warning)";
+            document.getElementById('instruction').style.borderColor = "var(--warning)";
+            updateSequenceUI();
+        };
+
+        // NEW: MANUAL LEARN ALGS BUTTONS
+        document.getElementById('btnLearnStep').onclick = () => {
+            initCube();
+            const algStr = document.getElementById('learnAlgSelect').value;
+            targetSequence = algStr.trim().split(/\s+/);
+            sequenceIndex = 0; wrongMoves = [];
+            timerState = 'learn_step';
+            
+            document.getElementById('main-timer').innerText = "STEP MODE";
+            document.getElementById('main-timer').style.color = "var(--success)";
+            
+            document.getElementById('instruction').innerText = "EXECUTE HIGHLIGHTED MOVE ON CUBE, PRESS SPACE FOR NEXT";
+            document.getElementById('instruction').style.color = "var(--success)";
+            document.getElementById('instruction').style.borderColor = "var(--success)";
+            updateSequenceUI();
+        };
+
+        document.getElementById('btnLearnSpeed').onclick = () => {
+            initCube();
+            const algStr = document.getElementById('learnAlgSelect').value;
+            targetSequence = algStr.trim().split(/\s+/);
+            sequenceIndex = 0; wrongMoves = [];
+            timerState = 'learn_speed_ready';
+            
+            document.getElementById('main-timer').innerText = "00:00.00";
+            document.getElementById('main-timer').style.color = "white";
+            
+            document.getElementById('instruction').innerText = "PRESS SPACE TO START TIMER";
+            document.getElementById('instruction').style.color = "var(--warning)";
+            document.getElementById('instruction').style.borderColor = "var(--warning)";
+            
+            const display = document.getElementById('sequence-display');
+            document.getElementById('sequence-wrapper').style.display = "inline-block";
+            display.innerHTML = targetSequence.map(m => `<span style="color: white; margin-right: 8px;">${m}</span>`).join('');
+            document.getElementById('sequence-translation').innerText = "Get ready to execute the entire algorithm.";
+            ghostGroup.clear(); // No ghost hints in speed mode
+        };
+
+
+        function startAlgTrainer() {
+            initCube();
+            const algStr = document.getElementById('algSelect').value;
+            targetSequence = algStr.trim().split(/\s+/);
+            sequenceIndex = 0; wrongMoves = [];
+            timerState = 'sequence';
+            
+            document.getElementById('main-timer').innerText = "TRAIN";
+            document.getElementById('main-timer').style.color = "var(--trainer)";
+            
+            document.getElementById('instruction').innerText = "FOLLOW THE LAMP TO LEARN THE ALGORITHM";
+            document.getElementById('instruction').style.color = "var(--trainer)";
+            document.getElementById('instruction').style.borderColor = "var(--trainer)";
+            updateSequenceUI();
+        }
+
+        document.getElementById('startAlg').onclick = startAlgTrainer;
+
+        document.getElementById('startGameBtn').onclick = () => {
+            initCube();
+            clearAllIntervals();
+            const gameType = document.getElementById('gameSelect').value;
+            if(gameType === 'defusal') initBombDefusal();
+            if(gameType === 'simon') initSimonSays();
+            if(gameType === 'smash') initColorSmash();
+        };
+
+        document.getElementById('resetCube').onclick = () => {
+            initCube();
+            clearAllIntervals();
+            timerState = 'idle'; activeGame = null;
+            document.getElementById('main-timer').innerText = "00:00.00";
+            document.getElementById('main-timer').style.color = "white";
+            document.getElementById('instruction').innerText = "CUBE UI RESET";
+            document.getElementById('instruction').style.color = "white";
+            document.getElementById('instruction').style.borderColor = "var(--border)";
+            document.getElementById('sequence-wrapper').style.display = "none";
+        };
+
+        document.getElementById('clearHistory').onclick = () => {
+            document.getElementById('history').innerHTML = '';
+        };
+
+        // Manual Keyboard Input Parser
+        document.getElementById('manualSubmit').onclick = () => {
+            const inputField = document.getElementById('manualInput');
+            const input = inputField.value.trim().toUpperCase();
+            if(!input) return;
+            
+            const rawMoves = input.split(/\s+/);
+            rawMoves.forEach(m => {
+                let move = m.replace('‘', "'").replace('’', "'"); // Normalize smart quotes
+                if (/^[UDLRFBM][2']?$/.test(move)) {
+                    processMove(move);
+                }
+            });
+            inputField.value = '';
+        };
+
+        document.getElementById('manualInput').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('manualSubmit').click();
+        });
+
+        // SPACEBAR LOGIC
+        window.addEventListener('keydown', (e) => {
+            // Only trigger spacebar logic if manual input box isn't focused
+            if(e.code === 'Space' && document.activeElement !== document.getElementById('manualInput')) {
+                e.preventDefault(); 
+                
+                if (timerState === 'running') {
+                    stopTimer();
+                } 
+                else if (timerState === 'learn_step') {
+                    if (sequenceIndex < targetSequence.length) {
+                        const move = targetSequence[sequenceIndex];
+                        document.getElementById('large-move').innerText = move;
+                        animateMove(move); // Animate virtual cube
+                        sequenceIndex++;
+                        updateSequenceUI();
+                        
+                        if (sequenceIndex >= targetSequence.length) {
+                            timerState = 'finished';
+                            document.getElementById('instruction').innerText = "ALGORITHM COMPLETE! WELL DONE.";
+                        }
+                    }
+                } 
+                else if (timerState === 'learn_speed_ready') {
+                    startSolvingTimer(false); // start speed test timer without hiding UI
+                } 
+                else if (timerState === 'learn_speed_running') {
+                    stopTimer();
+                }
+            }
+        });
+
+        function switchMode(mode, btnId) {
+            currentMode = mode;
+            const viewport = document.getElementById('viewport');
+            
+            // Reset Mode Buttons
+            document.querySelectorAll('.mode-btn').forEach(b => {
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                b.style.color = '#94a3b8';
+            });
+            
+            const activeBtn = document.getElementById(btnId);
+            activeBtn.classList.add('active');
+            activeBtn.style.color = 'white';
+            
+            // Hide specific controls initially
+            document.getElementById('genScramble').style.display = 'none';
+            document.querySelectorAll('.controls-panel').forEach(p => p.style.display = 'none');
+            document.getElementById('game-stats').style.display = 'none';
+
+            // Reset sequence, timers and ghosts
+            document.getElementById('sequence-wrapper').style.display = "none";
+            document.getElementById('main-timer').innerText = "00:00.00";
+            document.getElementById('main-timer').style.color = "white";
+            timerState = 'idle'; activeGame = null;
+            clearAllIntervals();
+            ghostGroup.clear();
+
+            // Setup Viewport Backgrounds & UI Specifics based on mode
+            if (mode === 'practice') {
+                viewport.style.background = 'radial-gradient(circle at center, #1e293b 0%, #020617 100%)'; 
+                activeBtn.style.background = 'var(--accent)';
+                
+                document.getElementById('instruction').innerText = "READY (PRACTICE: TURNING STARTS TIMER)";
+                document.getElementById('instruction').style.color = "white";
+                document.getElementById('instruction').style.borderColor = "var(--border)";
+            } 
+            else if (mode === 'comp') {
+                viewport.style.background = 'radial-gradient(circle at center, #0f172a 0%, #000000 100%)'; 
+                activeBtn.style.background = 'var(--accent)';
+                document.getElementById('genScramble').style.display = 'flex';
+                
+                document.getElementById('instruction').innerText = "GENERATE SCRAMBLE TO START";
+                document.getElementById('instruction').style.color = "var(--warning)";
+                document.getElementById('instruction').style.borderColor = "var(--warning)";
+            } 
+            else if (mode === 'learn') {
+                viewport.style.background = 'radial-gradient(circle at center, #064e3b 0%, #020617 100%)'; // Emerald Dark
+                activeBtn.style.background = 'var(--success)';
+                document.getElementById('learn-controls').style.display = 'block';
+                
+                document.getElementById('instruction').innerText = "SELECT A MANUAL LEARNING METHOD";
+                document.getElementById('instruction').style.color = "var(--success)";
+                document.getElementById('instruction').style.borderColor = "var(--success)";
+            }
+            else if (mode === 'trainer') {
+                viewport.style.background = 'radial-gradient(circle at center, #2e1065 0%, #020617 100%)'; 
+                activeBtn.style.background = 'var(--trainer)';
+                document.getElementById('trainer-controls').style.display = 'block';
+                
+                document.getElementById('instruction').innerText = "SELECT AN ALGORITHM TO TRAIN";
+                document.getElementById('instruction').style.color = "var(--trainer)";
+                document.getElementById('instruction').style.borderColor = "var(--trainer)";
+            } 
+            else if (mode === 'games') {
+                viewport.style.background = 'radial-gradient(circle at center, #4c0519 0%, #020617 100%)'; 
+                activeBtn.style.background = 'var(--games)';
+                document.getElementById('game-controls').style.display = 'block';
+                document.getElementById('game-stats').style.display = 'flex';
+                
+                document.getElementById('instruction').innerText = "SELECT A CHALLENGE ARCADE GAME";
+                document.getElementById('instruction').style.color = "var(--games)";
+                document.getElementById('instruction').style.borderColor = "var(--games)";
+            }
+        }
+
+        document.getElementById('modePractice').onclick = () => switchMode('practice', 'modePractice');
+        document.getElementById('modeComp').onclick = () => switchMode('comp', 'modeComp');
+        document.getElementById('modeLearn').onclick = () => switchMode('learn', 'modeLearn'); // NEW
+        document.getElementById('modeTrainer').onclick = () => switchMode('trainer', 'modeTrainer');
+        document.getElementById('modeGames').onclick = () => switchMode('games', 'modeGames');
+
+        // Initialize state view correctly
+        switchMode('comp', 'modeComp');
+
+        // --- BLUETOOTH ---
+        let myCube = null;
+        const macInput = document.getElementById('macInput');
+        macInput.value = localStorage.getItem('gan_mac_v4') || "";
+
+        document.getElementById('connectBtn').onclick = async () => {
+            if(myCube) return location.reload();
+            try {
+                document.getElementById('status').innerText = "CONNECTING...";
+                myCube = new BTCube();
+                await myCube.init(macInput.value.trim());
+                localStorage.setItem('gan_mac_v4', macInput.value);
+                document.getElementById('status').innerText = "CONNECTED";
+                document.getElementById('status').style.color = "var(--success)";
+                document.getElementById('connectBtn').innerText = "UNLINK";
+                document.getElementById('connectBtn').style.backgroundColor = "var(--danger)";
+                document.getElementById('instruction').innerText = "LINK ESTABLISHED. SELECT A MODE.";
+                
+                myCube.on('move', data => {
+                    let move = data.move.replace(/\s+/g, '').trim();
+                    if (move.endsWith("2'")) move = move[0] + "2";
+                    
+                    // Unified Engine trigger
+                    processMove(move);
+                });
+
+                const internal = myCube.getCube();
+                if(internal?.getBatteryLevel) {
+                    const [lvl] = await internal.getBatteryLevel();
+                    document.getElementById('battery').innerText = `${lvl}%`;
+                }
+            } catch(e) { 
+                document.getElementById('status').innerText = "FAILED TO CONNECT"; 
+                document.getElementById('status').style.color = "var(--danger)"; 
+            }
+        };
+
+        // --- RENDER LOOP & CAMERA ---
+        let isDragging = false, lastM = {x:0, y:0};
+        container.addEventListener('mousedown', (e) => { isDragging = true; lastM = {x:e.clientX, y:e.clientY}; });
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            if(!isDragging) return;
+            const q = new THREE.Quaternion().setFromEuler(new THREE.Euler((e.clientY-lastM.y)*0.005, (e.clientX-lastM.x)*0.005, 0, 'XYZ'));
+            camera.position.applyQuaternion(q); camera.lookAt(0,0,0);
+            lastM = {x:e.clientX, y:e.clientY};
+        });
+        document.getElementById('autoView').onclick = () => autoRotate = !autoRotate;
+        document.getElementById('centerView').onclick = () => { camera.position.set(7,6,11); camera.lookAt(0,0,0); };
+
+        function loop() {
+            requestAnimationFrame(loop);
+            
+            if(autoRotate) {
+                const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.01, 0));
+                camera.position.applyQuaternion(q); camera.lookAt(0,0,0);
+            }
+            
+            // Neon Lamp & Arrow Animations
+            if (ghostGroup.children.length > 0 && ghostAxis) {
+                ghostTimer += 0.04; 
+                const swing = Math.sin(ghostTimer) * 0.15; 
+                const pulse = 0.5 + Math.sin(performance.now() * 0.005) * 0.5; // 0 to 1 smooth wave
+
+                ghostGroup.children.forEach(child => {
+                    if (child.userData.isArrowPivot) {
+                        const arrowMesh = child.children[0];
+                        arrowMesh.traverse(c => {
+                            if(c.isMesh && c.material) c.material.opacity = 0.5 + (pulse * 0.5);
+                        });
+                        arrowMesh.rotation.z = arrowMesh.userData.baseRotZ + swing;
+                    } 
+                    else if (child.userData.isFaceGlow) {
+                        child.material.opacity = 0.15 + (pulse * 0.25);
+                    }
+                    else if (child.userData.isLampLight) {
+                        child.intensity = 2 + (pulse * 3);
+                    }
+                });
+            }
+
+            renderer.render(scene, camera);
+        }
+        loop();
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    </script>
+</body>
+</html>

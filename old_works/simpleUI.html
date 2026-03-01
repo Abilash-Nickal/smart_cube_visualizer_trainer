@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAN Carry - Custom UI Tracker</title>
+    <style>
+        :root {
+            --bg: #0f172a; --card: #1e293b; --text: #f8fafc; --text-dim: #94a3b8;
+            --primary: #3b82f6; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: var(--bg); color: var(--text);
+            margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center;
+        }
+        .container { width: 100%; max-width: 500px; background: var(--card); padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); text-align: center; border: 1px solid #334155; }
+        h1 { margin-top: 0; margin-bottom: 20px; }
+        
+        .input-group { text-align: left; margin-bottom: 20px; }
+        .input-group label { display: block; font-size: 14px; color: var(--text-dim); margin-bottom: 8px; font-weight: bold; }
+        input {
+            width: 100%; padding: 12px; background: #0b0f19; border: 1px solid #334155; 
+            color: var(--success); font-family: monospace; font-size: 16px; border-radius: 8px; 
+            box-sizing: border-box; text-align: center; outline: none;
+        }
+        input:focus { border-color: var(--primary); }
+        
+        button {
+            width: 100%; padding: 15px; background: var(--primary); color: white; 
+            border: none; border-radius: 8px; font-size: 18px; font-weight: bold; 
+            cursor: pointer; transition: 0.2s; margin-bottom: 10px;
+        }
+        button:hover { background: #2563eb; }
+        
+        #status { font-weight: bold; color: var(--text-dim); margin-bottom: 20px; font-size: 14px; }
+        
+        .move-display { font-size: 100px; font-weight: 900; color: var(--success); margin: 20px 0; min-height: 120px; text-shadow: 0 0 30px rgba(16, 185, 129, 0.4); }
+        
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .info-box { background: #0b0f19; padding: 15px; border-radius: 8px; border: 1px solid #334155; }
+        .info-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; }
+        .info-value { font-size: 20px; font-weight: bold; margin-top: 5px; color: white; }
+
+        #log {
+            background: #0b0f19; padding: 15px; border-radius: 8px; border: 1px solid #334155;
+            height: 200px; overflow-y: auto; font-family: monospace; font-size: 14px; color: #cbd5e1; text-align: left;
+        }
+        .log-entry { border-bottom: 1px solid #1e293b; padding: 8px 0; display: flex; justify-content: space-between; }
+        .highlight { color: var(--warning); font-weight: bold; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>GAN Cube Tracker</h1>
+        
+        <div class="input-group">
+            <label>Cube MAC Address (Required for Decryption)</label>
+            <input type="text" id="macAddress" placeholder="e.g. D4:36:39:XX:XX:XX">
+        </div>
+
+        <button id="connectBtn">🔌 Connect Cube</button>
+        <div id="status">Waiting for connection...</div>
+
+        <div class="move-display" id="largeMove">--</div>
+
+        <div class="info-grid">
+            <div class="info-box">
+                <div class="info-label">Battery</div>
+                <div class="info-value" id="batteryDisplay">--%</div>
+            </div>
+            <div class="info-box">
+                <div class="info-label">Move Time</div>
+                <div class="info-value" id="timeDisplay">0ms</div>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label>Move History Log</label>
+            <div id="log"></div>
+        </div>
+    </div>
+
+    <!-- Import the Library Engine dynamically -->
+    <script type="module">
+        import { BTCube } from 'https://esm.sh/gan-i3-356-bluetooth@latest';
+
+        const macInput = document.getElementById('macAddress');
+        const connectBtn = document.getElementById('connectBtn');
+        const statusEl = document.getElementById('status');
+        const largeMoveEl = document.getElementById('largeMove');
+        const logEl = document.getElementById('log');
+        const batteryDisplay = document.getElementById('batteryDisplay');
+        const timeDisplay = document.getElementById('timeDisplay');
+
+        // Load saved MAC
+        macInput.value = localStorage.getItem('cubeMacAddress') || "";
+        macInput.addEventListener('input', (e) => localStorage.setItem('cubeMacAddress', e.target.value));
+
+        let myCube = null;
+
+        function addLog(move, time) {
+            const el = document.createElement('div');
+            el.className = 'log-entry';
+            el.innerHTML = `<span>Move: <span class="highlight">${move}</span></span> <span style="color:#64748b">${time}ms</span>`;
+            logEl.prepend(el);
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            const mac = macInput.value.trim();
+            if (!mac || mac.length < 15) {
+                alert("Please enter a valid MAC address first!");
+                return;
+            }
+
+            if (myCube) {
+                try { await myCube.stop(); } catch(e){}
+                myCube = null;
+                connectBtn.innerText = "🔌 Connect Cube";
+                connectBtn.style.backgroundColor = "var(--primary)";
+                statusEl.innerText = "Disconnected.";
+                statusEl.style.color = "var(--text-dim)";
+                return;
+            }
+
+            try {
+                statusEl.innerText = "Requesting Bluetooth Device... (Check popup)";
+                statusEl.style.color = "var(--text-dim)";
+                
+                myCube = new BTCube();
+                
+                // Pass the MAC address into the library's init function!
+                await myCube.init(mac);
+                
+                statusEl.innerText = "✅ Connected & Decrypting!";
+                statusEl.style.color = "var(--success)";
+                connectBtn.innerText = "🛑 Disconnect";
+                connectBtn.style.backgroundColor = "var(--danger)";
+
+                // Event: Individual Move Details
+                myCube.on('move', (data) => {
+                    const move = data.move;
+                    const time = data.time;
+                    largeMoveEl.innerText = move;
+                    timeDisplay.innerText = `${time}ms`;
+                    addLog(move, time);
+                });
+
+                // Get initial Battery Level
+                if (typeof myCube.getCube === 'function') {
+                    const internalCube = myCube.getCube();
+                    if (internalCube && typeof internalCube.getBatteryLevel === 'function') {
+                        try {
+                            const [batteryLvl, _] = await internalCube.getBatteryLevel();
+                            batteryDisplay.innerText = `${batteryLvl}%`;
+                        } catch(e) {}
+                    }
+                }
+
+            } catch (error) {
+                console.error(error);
+                statusEl.innerText = `❌ Connection Failed: ${error.message}`;
+                statusEl.style.color = "var(--danger)";
+                myCube = null;
+            }
+        });
+    </script>
+</body>
+</html>

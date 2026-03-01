@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GAN Pro Comp Timer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #3b82f6; --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+            --bg: #020617; --glass: rgba(15, 23, 42, 0.95); --border: rgba(255, 255, 255, 0.1);
+        }
+        * { box-sizing: border-box; }
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100vh;
+            font-family: 'Inter', sans-serif; background: var(--bg);
+            color: white; overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        #viewport { flex: 1; position: relative; background: radial-gradient(circle at center, #1e293b 0%, #020617 100%); }
+        #ui-bottom { height: 180px; background: var(--glass); border-top: 1px solid var(--border); display: flex; flex-direction: column; padding: 10px; gap: 10px; z-index: 100; }
+
+        .glass-panel { background: var(--glass); backdrop-filter: blur(10px); border: 1px solid var(--border); border-radius: 15px; }
+        .top-left { position: absolute; top: 15px; left: 15px; padding: 10px; display: flex; gap: 5px; z-index: 50; }
+        .top-right { position: absolute; top: 15px; right: 15px; width: 220px; padding: 12px; z-index: 50; }
+        
+        .timer-center {
+            position: absolute; top: 80px; left: 50%; transform: translateX(-50%);
+            text-align: center; pointer-events: none; z-index: 40; width: 90%;
+        }
+        #main-timer { font-family: 'JetBrains Mono', monospace; font-size: clamp(40px, 8vw, 70px); font-weight: 800; line-height: 1; transition: color 0.2s; }
+        
+        #scramble-wrapper { background: rgba(0,0,0,0.85); padding: 15px 25px; border-radius: 12px; display: inline-block; margin-top: 15px; border: 1px solid var(--border);transform: translateY(400px); pointer-events: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5);}
+        #scramble-display { font-family: 'JetBrains Mono', monospace; font-size: 24px; word-spacing: 10px; line-height: 1.5; font-weight: bold; }
+        #scramble-translation { font-family: 'Inter', sans-serif; font-size: 15px; font-weight: bold; color: var(--accent); margin-top: 15px; background: rgba(59, 130, 246, 0.15); padding: 8px; border-radius: 6px;}
+        
+        .mode-btn { padding: 8px 12px; border: none; border-radius: 8px; background: transparent; color: #94a3b8; font-weight: 700; font-size: 11px; cursor: pointer; }
+        .mode-btn.active { background: var(--accent); color: white; }
+
+        .history-rail { flex: 1; display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 0 10px; scroll-behavior: smooth; }
+        .history-rail::-webkit-scrollbar { display: none; }
+        .move-pill { flex-shrink: 0; background: rgba(255,255,255,0.05); padding: 6px 12px; border-radius: 6px; font-family: 'JetBrains Mono', monospace; font-size: 14px; border: 1px solid var(--border); }
+        
+        .action-bar { height: 60px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; }
+        .btn { padding: 10px 15px; border-radius: 8px; border: none; background: var(--accent); color: white; font-weight: 700; font-size: 12px; cursor: pointer; transition: 0.2s; }
+        .btn:hover { opacity: 0.8; }
+        .btn-outline { background: rgba(255,255,255,0.05); color: #cbd5e1; border: 1px solid var(--border); }
+        
+        input { width: 100%; background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 6px; padding: 8px; color: white; font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-bottom: 8px; outline: none; }
+
+        #large-move { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 20vh; font-weight: 900; opacity: 0.03; pointer-events: none; }
+        
+        #instruction { position: absolute; bottom: 25px; left: 50%; transform: translate(-50%,-1650%); color: var(--warning); font-weight: 800; letter-spacing: 2px; text-transform: uppercase; font-size: 14px; text-align: center; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 20px; border: 1px solid var(--warning);}
+
+        .wrong-move-box { background: rgba(239, 68, 68, 0.25); padding: 4px 10px; border-radius: 6px; color: var(--danger); font-weight: 900; border: 2px solid var(--danger); display: inline-block; margin-top: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="viewport">
+        <div id="large-move">--</div>
+        
+        <div class="glass-panel top-left">
+            <button id="modePractice" class="mode-btn active">PRACTICE</button>
+            <button id="modeComp" class="mode-btn">COMPETITION</button>
+        </div>
+
+        <div class="glass-panel top-right">
+            <input type="text" id="macInput" placeholder="MAC: D4:36...">
+            <button id="connectBtn" class="btn" style="width:100%">LINK CUBE</button>
+            <div id="status" style="font-size: 10px; text-align: center; margin-top: 8px; opacity: 0.6;">CUBE DISCONNECTED</div>
+        </div>
+
+        <div class="timer-center">
+            <div id="main-timer">00:00.00</div>
+            <div id="scramble-wrapper" style="display:none;">
+                <div id="scramble-display"></div>
+                <div id="scramble-translation"></div>
+            </div>
+        </div>
+
+        <div id="instruction">HOLD CUBE: WHITE ON TOP, GREEN IN FRONT</div>
+
+        <div id="canvas-container" style="width:100%; height:100%"></div>
+    </div>
+
+    <div id="ui-bottom">
+        <div id="history" class="history-rail"></div>
+        <div class="action-bar">
+            <div style="display: flex; gap: 10px;">
+                <button id="genScramble" class="btn">GENERATE SCRAMBLE</button>
+                <button id="resetCube" class="btn btn-outline">RESET CUBE UI</button>
+                <button id="clearHistory" class="btn btn-outline">CLEAR HISTORY</button>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <div style="text-align: right; margin-right: 15px;">
+                    <div style="font-size: 10px; opacity: 0.5;">BATTERY</div>
+                    <div id="battery" style="font-family: 'JetBrains Mono'; font-weight: 800;">--%</div>
+                </div>
+                <button id="autoView" class="btn btn-outline">AUTO-VIEW</button>
+                <button id="centerView" class="btn btn-outline">CENTER</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { BTCube } from 'https://esm.sh/gan-i3-356-bluetooth@latest';
+
+        // ==========================================
+        // MODULE: CONSTANTS & GLOBALS
+        // ==========================================
+        const STICKER_COLORS = {
+            U: '#F3F3F3', D: '#F5B400', L: '#E87000', R: '#DC422F', F: '#009D54', B: '#3D81F6', CORE: '#050505'
+        };
+        const FACES = ['U','D','L','R','F','B'];
+        
+        let currentMode = 'comp'; 
+        let timerState = 'idle'; 
+        let startTime = 0, timerInterval = null, inspectionInterval = null, inspectionCountdown = 15;
+        let targetScramble = [], scrambleIndex = 0, wrongMoves = [];
+
+        let cubePieces = [], isAnimating = false, autoRotate = false, moveQueue = [];
+        let ghostAxis = null, ghostTargetAngle = 0, ghostTimer = 0;
+
+        // ==========================================
+        // MODULE: EFFECTS & TEXTURES
+        // ==========================================
+        function createStickerTexture(color, isLogo = false) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Base Black Plastic
+            ctx.fillStyle = STICKER_COLORS.CORE;
+            ctx.fillRect(0, 0, 512, 512);
+
+            // Colored Rounded Sticker
+            ctx.fillStyle = color;
+            const x = 20, y = 20, w = 472, h = 472, r = 50; 
+            ctx.beginPath();
+            ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+            ctx.fill();
+
+            const texture = new THREE.CanvasTexture(canvas);
+
+            // ==========================================
+            // YOUR CUSTOM LOGO LOGIC GOES HERE
+            // ==========================================
+            if (isLogo) {
+                
+                // --- OPTION 1: CUSTOM IMAGE LOGO ---
+                // We create an HTML Image object and draw it onto the canvas sticker.
+                const img = new Image();
+                img.crossOrigin = "Anonymous"; // Required to load external links safely
+                img.onload = () => {
+                    const imgSize = 400; // Size of your logo
+                    const offset = (512 - imgSize) / 2; // Perfect center calculation
+                    
+                    // Draw the image on top of the white sticker
+                    ctx.drawImage(img, offset, offset, imgSize, imgSize);
+                    
+                    // Critical: Tell Three.js the canvas has changed so it updates the 3D cube
+                    texture.needsUpdate = true; 
+                };
+                // Put your URL here:
+                img.src = 'A_logo.png'; // Example: 'https://example.com/mylogo.png'
+
+                
+                // --- OPTION 2: TEXT LOGO (Fallback) ---
+                // If you just want to use Text instead of an image link, comment out the "img.src" 
+                // above, and uncomment this block below:
+                /*
+                ctx.fillStyle = '#050505';
+                ctx.font = 'italic 70px "Times New Roman", serif';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText('Your', 256, 220);
+                ctx.font = '900 80px "Arial Black", sans-serif';
+                ctx.fillText('LOGO', 256, 300);
+                */
+            }
+
+            texture.anisotropy = 16;
+            return texture;
+        }
+
+        const MAT_U = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.U) });
+        const MAT_U_LOGO = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.U, true) });
+        const MAT_D = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.D) });
+        const MAT_L = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.L) });
+        const MAT_R = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.R) });
+        const MAT_F = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.F) });
+        const MAT_B = new THREE.MeshLambertMaterial({ map: createStickerTexture(STICKER_COLORS.B) });
+        const MAT_CORE = new THREE.MeshLambertMaterial({ color: STICKER_COLORS.CORE });
+
+        // ==========================================
+        // MODULE: CUBE (THREE.JS)
+        // ==========================================
+        const scene = new THREE.Scene();
+        const container = document.getElementById('canvas-container');
+        const camera = new THREE.PerspectiveCamera(35, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirLight.position.set(5, 5, 5);
+        scene.add(dirLight);
+        camera.position.set(7, 6, 11);
+        camera.lookAt(0,0,0);
+
+        const ghostGroup = new THREE.Group();
+        scene.add(ghostGroup);
+
+        function initCube() {
+            cubePieces.forEach(p => scene.remove(p));
+            cubePieces = [];
+            ghostGroup.clear();
+            ghostAxis = null;
+
+            for(let x=-1; x<=1; x++) {
+                for(let y=-1; y<=1; y++) {
+                    for(let z=-1; z<=1; z++) {
+                        if(x===0 && y===0 && z===0) continue;
+                        const mats = [
+                            x === 1 ? MAT_R : MAT_CORE,
+                            x === -1 ? MAT_L : MAT_CORE,
+                            y === 1 ? (x===0 && z===0 ? MAT_U_LOGO : MAT_U) : MAT_CORE,
+                            y === -1 ? MAT_D : MAT_CORE,
+                            z === 1 ? MAT_F : MAT_CORE,
+                            z === -1 ? MAT_B : MAT_CORE,
+                        ];
+                        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.96, 0.96), mats);
+                        mesh.position.set(x, y, z);
+                        mesh.userData.home = new THREE.Vector3(x, y, z);
+                        scene.add(mesh);
+                        cubePieces.push(mesh);
+                    }
+                }
+            }
+        }
+
+        function animateMove(moveStr, duration = 80) {
+            if (isAnimating) { moveQueue.push({moveStr, duration}); return; }
+            isAnimating = true;
+            
+            const face = moveStr[0], isPrime = moveStr.includes("'"), isDouble = moveStr.includes("2");
+            let axis, val, dir = 1;
+            switch(face) {
+                case 'U': axis='y'; val=1;  dir=-1; break;
+                case 'D': axis='y'; val=-1; dir=1;  break;
+                case 'L': axis='x'; val=-1; dir=1;  break;
+                case 'R': axis='x'; val=1;  dir=-1; break;
+                case 'F': axis='z'; val=1;  dir=-1; break;
+                case 'B': axis='z'; val=-1; dir=1;  break;
+            }
+            
+            const group = new THREE.Group();
+            scene.add(group);
+            
+            // Effect: Add intense PointLight glow during rotation
+            const pLight = new THREE.PointLight(0xffffff, 3, 15);
+            group.add(pLight);
+            
+            const pos = new THREE.Vector3();
+            const targets = cubePieces.filter(p => { p.getWorldPosition(pos); return Math.round(pos[axis]) === val; });
+            targets.forEach(p => group.attach(p));
+            
+            let angle = (Math.PI/2) * dir;
+            if(isPrime) angle *= -1; if(isDouble) angle *= 2;
+
+            const start = performance.now();
+            function step() {
+                const now = performance.now();
+                const progress = Math.min((now - start) / duration, 1);
+                
+                group.rotation[axis] = angle * (1 - Math.pow(1 - progress, 4)); 
+                pLight.intensity = 3 * (1 - progress); // Fade out glow
+                
+                if(progress < 1) requestAnimationFrame(step);
+                else {
+                    group.updateMatrixWorld();
+                    targets.forEach(p => {
+                        scene.attach(p);
+                        p.position.x = Math.round(p.position.x);
+                        p.position.y = Math.round(p.position.y);
+                        p.position.z = Math.round(p.position.z);
+                        p.rotation.x = Math.round(p.rotation.x/(Math.PI/2))*(Math.PI/2);
+                        p.rotation.y = Math.round(p.rotation.y/(Math.PI/2))*(Math.PI/2);
+                        p.rotation.z = Math.round(p.rotation.z/(Math.PI/2))*(Math.PI/2);
+                        p.updateMatrix();
+                    });
+                    scene.remove(group);
+                    isAnimating = false;
+                    
+                    if(moveQueue.length > 0) { 
+                        const n = moveQueue.shift(); animateMove(n.moveStr, n.duration); 
+                    }
+                }
+            }
+            step();
+        }
+
+        function buildGhostHint(moveStr, colorHex) {
+            ghostGroup.clear();
+            if (!moveStr) { ghostAxis = null; return; }
+
+            const face = moveStr[0], isPrime = moveStr.includes("'"), isDouble = moveStr.includes("2");
+            let axis, val, dir = 1;
+            switch(face) {
+                case 'U': axis='y'; val=1.03;  dir=-1; break;
+                case 'D': axis='y'; val=-1.03; dir=1;  break;
+                case 'L': axis='x'; val=-1.03; dir=1;  break;
+                case 'R': axis='x'; val=1.03;  dir=-1; break;
+                case 'F': axis='z'; val=1.03;  dir=-1; break;
+                case 'B': axis='z'; val=-1.03; dir=1;  break;
+            }
+
+            let geo;
+            if (axis === 'x') geo = new THREE.BoxGeometry(0.05, 0.9, 0.9);
+            if (axis === 'y') geo = new THREE.BoxGeometry(0.9, 0.05, 0.9);
+            if (axis === 'z') geo = new THREE.BoxGeometry(0.9, 0.9, 0.05);
+
+            const ghostMat = new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.4 });
+
+            for(let i=-1; i<=1; i++) {
+                for(let j=-1; j<=1; j++) {
+                    const mesh = new THREE.Mesh(geo, ghostMat);
+                    if (axis === 'x') mesh.position.set(val, i, j);
+                    if (axis === 'y') mesh.position.set(i, val, j);
+                    if (axis === 'z') mesh.position.set(i, j, val);
+                    ghostGroup.add(mesh);
+                }
+            }
+
+            ghostTargetAngle = (Math.PI / 2) * dir;
+            if (isPrime) ghostTargetAngle *= -1;
+            if (isDouble) ghostTargetAngle *= 2;
+            
+            ghostAxis = axis;
+            ghostTimer = 0;
+        }
+
+        // ==========================================
+        // MODULE: UI & STATE MANAGEMENT
+        // ==========================================
+        function translateMove(move) {
+            const tr = {
+                "U": "Top Face (White) Clockwise (Left)", "U'": "Top Face (White) Counter-Clockwise (Right)", "U2": "Top Face (White) Double Turn",
+                "D": "Bottom Face (Yellow) Clockwise (Right)", "D'": "Bottom Face (Yellow) Counter-Clockwise (Left)", "D2": "Bottom Face (Yellow) Double Turn",
+                "R": "Right Face (Red) Clockwise (Up)", "R'": "Right Face (Red) Counter-Clockwise (Down)", "R2": "Right Face (Red) Double Turn",
+                "L": "Left Face (Orange) Clockwise (Down)", "L'": "Left Face (Orange) Counter-Clockwise (Up)", "L2": "Left Face (Orange) Double Turn",
+                "F": "Front Face (Green) Clockwise (Right)", "F'": "Front Face (Green) Counter-Clockwise (Left)", "F2": "Front Face (Green) Double Turn",
+                "B": "Back Face (Blue) Clockwise (Left)", "B'": "Back Face (Blue) Counter-Clockwise (Right)", "B2": "Back Face (Blue) Double Turn",
+            };
+            return tr[move] || move;
+        }
+
+        function generateValidScramble() {
+            const mods = ['', "'", '2'];
+            let sc = [], lastFace = -1;
+            for(let i=0; i<20; i++) {
+                let f; do { f = Math.floor(Math.random() * 6); } while (f === lastFace);
+                lastFace = f; sc.push(FACES[f] + mods[Math.floor(Math.random() * 3)]);
+            }
+            return sc;
+        }
+
+        function reverseMove(m) {
+            if (m.endsWith("2")) return m; 
+            if (m.endsWith("'")) return m[0]; 
+            return m + "'"; 
+        }
+
+        function updateScrambleUI() {
+            const wrapper = document.getElementById('scramble-wrapper');
+            const display = document.getElementById('scramble-display');
+            const translation = document.getElementById('scramble-translation');
+            
+            if (timerState !== 'scrambling') {
+                ghostGroup.clear(); ghostAxis = null;
+                if (timerState === 'running') wrapper.style.display = "none";
+                return;
+            }
+
+            wrapper.style.display = "inline-block";
+            let html = '';
+            
+            for(let i=0; i < scrambleIndex; i++) html += `<span style="color: #475569; margin-right: 8px;">${targetScramble[i]}</span>`;
+            
+            let expectedMove = "";
+            let hintColor = 0x10b981; 
+            
+            if (wrongMoves.length > 0) {
+                expectedMove = reverseMove(wrongMoves[wrongMoves.length - 1]);
+                hintColor = 0xef4444; 
+                html += `<span style="color: var(--danger); font-size: 32px; font-weight: 900; margin-right: 8px; text-decoration: underline;">${expectedMove}</span>`;
+                translation.innerHTML = `⚠️ MISTAKE! To fix, perform:<br/><span class="wrong-move-box">${translateMove(expectedMove)}</span>`;
+                translation.style.color = "var(--danger)"; translation.style.background = "transparent";
+            } else if (scrambleIndex < targetScramble.length) {
+                expectedMove = targetScramble[scrambleIndex];
+                html += `<span style="color: var(--warning); font-size: 32px; font-weight: 900; margin-right: 8px; text-decoration: underline;">${expectedMove}</span>`;
+                translation.innerText = translateMove(expectedMove);
+                translation.style.color = "var(--accent)"; translation.style.background = "rgba(59, 130, 246, 0.15)";
+            }
+
+            for(let i=scrambleIndex + 1; i < targetScramble.length; i++) html += `<span style="color: white; margin-right: 8px;">${targetScramble[i]}</span>`;
+            display.innerHTML = html;
+            
+            if (expectedMove) buildGhostHint(expectedMove, hintColor);
+            else ghostGroup.clear();
+        }
+
+        function startInspection() {
+            timerState = 'inspection';
+            updateScrambleUI(); 
+            inspectionCountdown = 15;
+            document.getElementById('instruction').innerText = "INSPECTION (MAKE ANY TURN TO START TIMER)";
+            document.getElementById('instruction').style.color = "white";
+            document.getElementById('instruction').style.borderColor = "var(--border)";
+            
+            const wrapper = document.getElementById('scramble-wrapper');
+            wrapper.style.display = "inline-block";
+            document.getElementById('scramble-display').innerHTML = `<span style="color:var(--success); font-size: 26px; font-weight: bold;">SCRAMBLE COMPLETE!</span>`;
+            document.getElementById('scramble-translation').innerText = "Inspect your cube.";
+            
+            document.getElementById('main-timer').innerText = "15";
+            document.getElementById('main-timer').style.color = "var(--danger)";
+            
+            inspectionInterval = setInterval(() => {
+                inspectionCountdown--;
+                if (inspectionCountdown > 0) document.getElementById('main-timer').innerText = inspectionCountdown.toString();
+                else { clearInterval(inspectionInterval); startSolvingTimer(); }
+            }, 1000);
+        }
+
+        function formatTime(ms) {
+            const m = Math.floor(ms/60000);
+            const s = Math.floor((ms%60000)/1000);
+            const c = Math.floor((ms%1000)/10);
+            return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}.${c.toString().padStart(2,'0')}`;
+        }
+
+        function startSolvingTimer() {
+            if (inspectionInterval) clearInterval(inspectionInterval);
+            timerState = 'running';
+            startTime = performance.now();
+            document.getElementById('main-timer').style.color = "white"; 
+            document.getElementById('instruction').innerText = "SOLVING... (PRESS SPACEBAR WHEN SOLVED)";
+            document.getElementById('scramble-wrapper').style.display = "none";
+            
+            timerInterval = setInterval(() => {
+                document.getElementById('main-timer').innerText = formatTime(performance.now() - startTime);
+            }, 10);
+        }
+
+        function stopTimer() {
+            if (timerState !== 'running') return;
+            clearInterval(timerInterval);
+            timerState = 'finished';
+            document.getElementById('instruction').innerText = "SOLVE COMPLETE!";
+            document.getElementById('instruction').style.color = "var(--success)";
+            document.getElementById('instruction').style.borderColor = "var(--success)";
+            document.getElementById('main-timer').style.color = "var(--success)";
+        }
+
+        // ==========================================
+        // MODULE: MAIN & EVENTS
+        // ==========================================
+        initCube();
+
+        document.getElementById('genScramble').onclick = () => {
+            initCube();
+            targetScramble = generateValidScramble();
+            scrambleIndex = 0; wrongMoves = [];
+            timerState = 'scrambling';
+            document.getElementById('main-timer').innerText = "00:00.00";
+            document.getElementById('main-timer').style.color = "white";
+            
+            document.getElementById('instruction').innerText = "HOLD CUBE: WHITE ON TOP, GREEN IN FRONT";
+            document.getElementById('instruction').style.color = "var(--warning)";
+            document.getElementById('instruction').style.borderColor = "var(--warning)";
+            updateScrambleUI();
+        };
+
+        document.getElementById('resetCube').onclick = () => {
+            initCube();
+            clearInterval(timerInterval); clearInterval(inspectionInterval);
+            timerState = 'idle';
+            document.getElementById('main-timer').innerText = "00:00.00";
+            document.getElementById('main-timer').style.color = "white";
+            document.getElementById('instruction').innerText = "CUBE UI RESET";
+            document.getElementById('scramble-wrapper').style.display = "none";
+        };
+
+        document.getElementById('clearHistory').onclick = () => {
+            document.getElementById('history').innerHTML = '';
+        };
+
+        window.addEventListener('keydown', (e) => {
+            if(e.code === 'Space') {
+                e.preventDefault(); 
+                if(timerState === 'running') stopTimer();
+            }
+        });
+
+        document.getElementById('modePractice').onclick = () => {
+            currentMode = 'practice';
+            document.getElementById('modePractice').classList.add('active');
+            document.getElementById('modeComp').classList.remove('active');
+            document.getElementById('instruction').innerText = "READY (PRACTICE: TURNING STARTS TIMER)";
+        };
+
+        document.getElementById('modeComp').onclick = () => {
+            currentMode = 'comp';
+            document.getElementById('modeComp').classList.add('active');
+            document.getElementById('modePractice').classList.remove('active');
+            document.getElementById('instruction').innerText = "GENERATE SCRAMBLE TO START";
+        };
+
+        // ==========================================
+        // MODULE: BLUETOOTH
+        // ==========================================
+        let myCube = null;
+        const macInput = document.getElementById('macInput');
+        macInput.value = localStorage.getItem('gan_mac_v4') || "";
+
+        document.getElementById('connectBtn').onclick = async () => {
+            if(myCube) return location.reload();
+            try {
+                document.getElementById('status').innerText = "CONNECTING...";
+                myCube = new BTCube();
+                await myCube.init(macInput.value.trim());
+                localStorage.setItem('gan_mac_v4', macInput.value);
+                document.getElementById('status').innerText = "CONNECTED";
+                document.getElementById('status').style.color = "var(--success)";
+                document.getElementById('connectBtn').innerText = "UNLINK";
+                document.getElementById('connectBtn').style.backgroundColor = "var(--danger)";
+                document.getElementById('instruction').innerText = "LINK ESTABLISHED. CLICK GENERATE.";
+                
+                myCube.on('move', data => {
+                    const move = data.move.replace(/\s+/g, '').trim();
+                    
+                    document.getElementById('large-move').innerText = move;
+                    animateMove(move);
+
+                    const pill = document.createElement('div');
+                    pill.className = 'move-pill'; pill.innerText = move;
+                    const h = document.getElementById('history');
+                    h.appendChild(pill); 
+                    h.scrollTo({ left: h.scrollWidth, behavior: 'smooth' });
+
+                    if (timerState === 'scrambling') {
+                        if (wrongMoves.length > 0) {
+                            const expectedUndo = reverseMove(wrongMoves[wrongMoves.length - 1]);
+                            if (move === expectedUndo) wrongMoves.pop(); 
+                            else if (expectedUndo.endsWith('2') && move[0] === expectedUndo[0] && !move.endsWith('2')) wrongMoves[wrongMoves.length - 1] = move; 
+                            else wrongMoves.push(move); 
+                        } else {
+                            const target = targetScramble[scrambleIndex];
+                            if (move === target) {
+                                scrambleIndex++;
+                                if (scrambleIndex >= targetScramble.length) startInspection();
+                            } else if (target.endsWith('2') && move[0] === target[0] && !move.endsWith('2')) targetScramble[scrambleIndex] = move;
+                            else wrongMoves.push(move); 
+                        }
+                        updateScrambleUI();
+                    } 
+                    else if (timerState === 'inspection') startSolvingTimer();
+                    else if (currentMode === 'practice' && (timerState === 'idle' || timerState === 'finished')) {
+                        clearInterval(timerInterval);
+                        document.getElementById('scramble-wrapper').style.display = "none";
+                        startSolvingTimer();
+                    }
+                });
+
+                const internal = myCube.getCube();
+                if(internal?.getBatteryLevel) {
+                    const [lvl] = await internal.getBatteryLevel();
+                    document.getElementById('battery').innerText = `${lvl}%`;
+                }
+            } catch(e) { 
+                document.getElementById('status').innerText = "FAILED TO CONNECT"; 
+                document.getElementById('status').style.color = "var(--danger)"; 
+            }
+        };
+
+        // ==========================================
+        // RENDER LOOP & INPUT
+        // ==========================================
+        let isDragging = false, lastM = {x:0, y:0};
+        container.addEventListener('mousedown', (e) => { isDragging = true; lastM = {x:e.clientX, y:e.clientY}; });
+        window.addEventListener('mouseup', () => isDragging = false);
+        window.addEventListener('mousemove', (e) => {
+            if(!isDragging) return;
+            const q = new THREE.Quaternion().setFromEuler(new THREE.Euler((e.clientY-lastM.y)*0.005, (e.clientX-lastM.x)*0.005, 0, 'XYZ'));
+            camera.position.applyQuaternion(q); camera.lookAt(0,0,0);
+            lastM = {x:e.clientX, y:e.clientY};
+        });
+        document.getElementById('autoView').onclick = () => autoRotate = !autoRotate;
+        document.getElementById('centerView').onclick = () => { camera.position.set(7,6,11); camera.lookAt(0,0,0); };
+
+        function loop() {
+            requestAnimationFrame(loop);
+            
+            if(autoRotate) {
+                const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.01, 0));
+                camera.position.applyQuaternion(q); camera.lookAt(0,0,0);
+            }
+            
+            if (ghostGroup.children.length > 0 && ghostAxis) {
+                ghostTimer += 0.025; 
+                if (ghostTimer > 1) ghostTimer = 0;
+                
+                let progress = 0;
+                if (ghostTimer < 0.6) progress = 1 - Math.pow(1 - (ghostTimer / 0.6), 3); 
+                else progress = 1; 
+                
+                ghostGroup.rotation.set(0,0,0);
+                ghostGroup.rotation[ghostAxis] = progress * ghostTargetAngle;
+            }
+
+            renderer.render(scene, camera);
+        }
+        loop();
+        window.addEventListener('resize', () => {
+            camera.aspect = container.clientWidth / container.clientHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        });
+    </script>
+</body>
+</html>

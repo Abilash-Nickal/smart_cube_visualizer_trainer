@@ -37,10 +37,10 @@ This project connects a physical **GAN 356 i3 Smart Cube** to a web browser via 
 graph TD
     A[Physical GAN Cube] -- "BLE Packets (Encrypted)" --> B[Web Bluetooth API]
     B --> C{AES Decryption Engine}
-    C -- "MAC-based Key" --> D[Clean Move Strings (U, R', F2)]
+    C -- "MAC-based Key" --> D["Clean Move Strings (U, R', F2)"]
     D --> E[State Machine Logic]
-    E --> F[3D Engine (Three.js)]
-    E --> G[UI components (Timer/History)]
+    E --> F["3D Engine (Three.js)"]
+    E --> G["UI components (Timer/History)"]
     F --> H[Procedural Cube Model]
     F --> I[Neon Hologram Hints]
     H -- "Dynamic Grouping" --> J[Animated 3D Rotation]

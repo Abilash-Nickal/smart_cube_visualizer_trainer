@@ -1,0 +1,8 @@
+node_modules/
+venv/
+.venv/
+.vscode/
+*.log
+.DS_Store
+mac_address.txt
+separate files/package-lock.json

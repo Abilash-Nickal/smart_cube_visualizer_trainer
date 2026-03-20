@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>GAN Pro CFOP Trainer | Poppins Edition</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Imported Poppins for Buttons and Inter/JetBrains for Data -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Poppins:wght@400;600;700&family=JetBrains+Mono:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --accent: #3b82f6;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --games: #f43f5e;
+            --trainer: #8b5cf6;
+            --bg: #020617;
+            --glass-bg: rgba(15, 23, 42, 0.75);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body, html {
+            margin: 0; padding: 0; width: 100%; height: 100vh;
+            font-family: 'Inter', sans-serif; background: var(--bg);
+            color: white; overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        #viewport { 
+            flex: 1; position: relative; 
+            background: radial-gradient(circle at 50% 50%, #1e293b 0%, #020617 100%); 
+        }
+
+        /* Glassmorphism Global Class */
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            box-shadow: var(--glass-shadow);
+        }
+
+        .top-container {
+            position: absolute; top: 20px; left: 20px; right: 20px;
+            display: flex; justify-content: space-between; align-items: flex-start;
+            z-index: 100; pointer-events: none;
+        }
+        .top-container > * { pointer-events: auto; }
+
+        .modes-panel { display: flex; gap: 6px; padding: 60px; }
+
+        .connection-panel { width: 250px; padding: 18px; }
+
+        .controls-panel {
+            position: absolute; top: 95px; left: 20px; padding: 15px; 
+            width: 250px; display: none; z-index: 90;
+        }
+
+        /* Timer HUD */
+        .timer-center {
+            position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+            text-align: center; pointer-events: none; z-index: 40; width: 95%;
+        }
+        #main-timer { 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: clamp(60px, 10vw, 110px); 
+            font-weight: 800; line-height: 1; 
+            text-shadow: 0 4px 30px rgba(0,0,0,0.6);
+        }
+
+        #sequence-wrapper { 
+            background: rgba(0,0,0,0.5); 
+            backdrop-filter: blur(10px);
+            padding: 24px 35px; border-radius: 24px; 
+            margin-top: 35px; border: 1px solid var(--glass-border); 
+            pointer-events: auto; box-shadow: 0 15px 45px rgba(0,0,0,0.5);
+        }
+        #sequence-display { font-family: 'JetBrains Mono', monospace; font-size: 30px; font-weight: bold; }
+        #sequence-translation { font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 600; color: var(--accent); margin-top: 15px; }
+
+        /* Toolbar */
+        .toolbar-v {
+            position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+            display: flex; flex-direction: column; gap: 14px; padding: 14px; z-index: 50;
+        }
+
+        /* Bottom Bar */
+        #ui-bottom { 
+            height: 85px; background: rgba(2, 6, 23, 0.85); 
+            backdrop-filter: blur(25px); border-top: 1px solid var(--glass-border);
+            display: flex; align-items: center; padding: 0 24px; gap: 20px; z-index: 110;
+        }
+
+        .history-rail { flex: 1; display: flex; align-items: center; gap: 12px; overflow-x: auto; padding: 10px 0; }
+        .history-rail::-webkit-scrollbar { display: none; }
+        .move-pill { 
+            flex-shrink: 0; background: rgba(255,255,255,0.08); 
+            padding: 10px 16px; border-radius: 12px; 
+            font-family: 'JetBrains Mono', monospace; font-size: 16px; font-weight: 700;
+            border: 1px solid var(--glass-border);
+        }
+
+        /* Buttons with Poppins Font */
+        .btn { 
+            font-family: 'Poppins', sans-serif;
+            padding: 12px 20px; border-radius: 14px; border: none; 
+            background: var(--accent); color: white; font-weight: 600; 
+            font-size: 14px; cursor: pointer; transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .btn:hover { transform: translateY(-3px) scale(1.02); filter: brightness(1.2); }
+        .btn-outline { background: rgba(255,255,255,0.05); border: 1px solid var(--glass-border); }
+        
+        .mode-btn { 
+            font-family: 'Poppins', sans-serif;
+            padding: 12px 18px; border: none; border-radius: 12px; background: transparent; 
+            color: #94a3b8; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s;
+        }
+        .mode-btn.active { background: var(--accent); color: white; }
+
+        .icon-btn { width: 52px; height: 52px; border-radius: 16px; padding: 0; }
+        .icon-btn svg { width: 24px; height: 24px; stroke: white; }
+
+        input, select { 
+            width: 100%; background: rgba(0,0,0,0.4); border: 1px solid var(--glass-border); 
+            border-radius: 12px; padding: 12px; color: white; 
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; margin-bottom: 12px;
+        }
+
+        /* Social Link Buttons */
+        .social-dock { display: flex; gap: 12px; margin-left: auto; }
+        .social-btn {
+            width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            text-decoration: none; border-radius: 14px;
+        }
+        .social-btn:hover { transform: scale(1.15) rotate(5deg); background: rgba(255,255,255,0.1); }
+        .social-btn svg { width: 22px; height: 22px; fill: white; }
+
+        #instruction { 
+            position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%); 
+            font-family: 'Poppins', sans-serif;
+            color: var(--warning); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; 
+            font-size: 13px; text-align: center; background: var(--glass-bg); padding: 14px 28px; 
+            border-radius: 40px; border: 1px solid var(--warning); z-index: 60;
+            backdrop-filter: blur(12px);
+        }
+
+        #large-move { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 25vh; font-weight: 900; opacity: 0.04; pointer-events: none; z-index: 0; }
+    </style>
+</head>
+<body>
+
+    <div id="viewport">
+        <div id="large-move">--</div>
+        
+        <div class="top-container">
+            <div class="glass modes-panel">
+                <button id="modePractice" class="mode-btn">Practice</button>
+                <button id="modeComp" class="mode-btn active">Competition</button>
+                <button id="modeTrainer" class="mode-btn">Trainer</button>
+                <button id="modeGames" class="mode-btn" style="color:var(--games);">Games</button>
+            </div>
+
+            <div class="glass connection-panel">
+                <input type="text" id="macInput" placeholder="MAC: D4:36...">
+                <button id="connectBtn" class="btn" style="width:100%">Link Cube</button>
+                <div id="status" style="font-size: 10px; text-align: center; margin-top: 12px; opacity: 0.6; font-weight: 700; font-family: 'Poppins'">DISCONNECTED</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--glass-border);">
+                    <span style="font-size: 10px; opacity: 0.5; font-weight: 800;">BATTERY</span>
+                    <span id="battery" style="font-family: 'JetBrains Mono'; font-weight: 800; color: var(--success);">--%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sub Panels -->
+        <div id="trainer-controls" class="glass controls-panel">
+            <div style="font-family: 'Poppins'; font-size: 10px; font-weight: 800; color: var(--trainer); margin-bottom: 10px; text-transform: uppercase;">CFOP Learning</div>
+            <select id="algSelect"></select>
+            <button id="startAlg" class="btn" style="width:100%; background:var(--trainer);">Start Algorithm</button>
+        </div>
+
+        <div id="game-controls" class="glass controls-panel">
+            <div style="font-family: 'Poppins'; font-size: 10px; font-weight: 800; color: var(--games); margin-bottom: 10px; text-transform: uppercase;">Arcade Challenges</div>
+            <select id="gameSelect">
+                <option value="defusal">💣 Bomb Defusal</option>
+                <option value="simon">🧠 Simon Says</option>
+                <option value="smash">🎨 Color Smash</option>
+            </select>
+            <button id="startGameBtn" class="btn" style="width:100%; background:var(--games);">Play Game</button>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="glass toolbar-v">
+            <button id="genScramble" class="btn icon-btn" title="Scramble">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 3 21 3 21 8"></polyline><line x1="4" y1="20" x2="21" y2="3"></line><polyline points="21 16 21 21 16 21"></polyline><line x1="15" y1="15" x2="21" y2="21"></line><line x1="4" y1="4" x2="9" y2="9"></line></svg>
+            </button>
+            <button id="resetCube" class="btn btn-outline icon-btn" title="Reset">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><polyline points="3 3 3 8 8 8"></polyline></svg>
+            </button>
+            <button id="autoView" class="btn btn-outline icon-btn" title="Rotate View">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            </button>
+            <button id="centerView" class="btn btn-outline icon-btn" title="Center">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="22" y1="12" x2="18" y2="12"></line><line x1="6" y1="12" x2="2" y2="12"></line><line x1="12" y1="6" x2="12" y2="2"></line><line x1="12" y1="22" x2="12" y2="18"></line></svg>
+            </button>
+        </div>
+
+        <div class="timer-center">
+            <div id="main-timer">00:00.00</div>
+            <div id="sequence-wrapper" style="display:none;">
+                <div id="sequence-display"></div>
+                <div id="sequence-translation"></div>
+            </div>
+        </div>
+
+        <div id="instruction">Connect your GAN Cube to begin training</div>
+
+        <div id="canvas-container" style="width:100%; height:100%"></div>
+    </div>
+
+    <!-- Dock -->
+    <div id="ui-bottom">
+        <div id="history" class="history-rail"></div>
+        <button id="clearHistory" class="btn btn-outline" style="white-space:nowrap; padding: 10px 16px;">Clear Log</button>
+        
+        <div class="social-dock">
+            <a href="https://github.com/yourusername" target="_blank" class="glass social-btn" title="GitHub">
+                <svg viewBox="0 0 24 24"><path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/></svg>
+            </a>
+            <a href="https://linkedin.com/in/yourusername" target="_blank" class="glass social-btn" title="LinkedIn">
+                <svg viewBox="0 0 24 24"><path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.238 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/></svg>
+            </a>
+        </div>
+    </div>
+
+    <script type="module">
+        import { BTCube } from 'https://esm.sh/gan-i3-356-bluetooth@latest';
+
+        // Dictionary of Algorithms
+        const CFOP_ALGORITHMS = {
+            "OLL Algorithms": [
+                { name: "OLL 21 (Sune)", alg: "R U R' U R U2 R'" },
+                { name: "OLL 22 (Anti-Sune)", alg: "R U2 R' U' R U' R'" },
+                { name: "OLL 23 (Headlights)", alg: "R2 D R' U2 R D' R' U2 R'" }
+            ],
+            "PLL Algorithms": [
+                { name: "T Perm", alg: "R U R' U' R' F R2 U' R' U' R U R' F'" },
+                { name: "Y Perm", alg: "F R U' R' U' R U R' F' R U R' U' R' F R F'" },
+                { name: "Ua Perm", alg: "R U' R U R U R U' R' U' R2" }
+            ]
+        };
+
+        const algSelect = document.getElementById('algSelect');
+        for (const [cat, list] of Object.entries(CFOP_ALGORITHMS)) {
+            const group = document.createElement('optgroup');
+            group.label = cat;
+            list.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a.alg; opt.textContent = a.name;
+                group.appendChild(opt);
+            });
+            algSelect.appendChild(group);
+        }
+
+        // --- THEME ---
+        const COLORS = { U:'#FFFFFF', D:'#FFD500', L:'#FF5800', R:'#C41E3A', F:'#009E60', B:'#0051BA', CORE:'#080808' };
+        
+        // --- 3D ENGINE ---
+        const scene = new THREE.Scene();
+        const container = document.getElementById('canvas-container');
+        const camera = new THREE.PerspectiveCamera(35, container.clientWidth / container.clientHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 1));
+        camera.position.set(7, 6, 11);
+        camera.lookAt(0,0,0);
+
+        let cubePieces = [], isAnimating = false, autoRotate = false, moveQueue = [];
+
+        function initCube() {
+            cubePieces.forEach(p => scene.remove(p));
+            cubePieces = [];
+            for(let x=-1; x<=1; x++) {
+                for(let y=-1; y<=1; y++) {
+                    for(let z=-1; z<=1; z++) {
+                        if(x===0 && y===0 && z===0) continue;
+                        const group = new THREE.Group();
+                        const core = new THREE.Mesh(new THREE.BoxGeometry(0.96,0.96,0.96), new THREE.MeshLambertMaterial({color: COLORS.CORE}));
+                        group.add(core);
+                        
+                        const stickerG = new THREE.BoxGeometry(0.84, 0.84, 0.02);
+                        const sConf = [
+                            {p:[0,0,0.485], r:[0,0,0], c:z===1?COLORS.F:null},
+                            {p:[0,0,-0.485], r:[0,Math.PI,0], c:z===-1?COLORS.B:null},
+                            {p:[0,0.485,0], r:[-Math.PI/2,0,0], c:y===1?COLORS.U:null},
+                            {p:[0,-0.485,0], r:[Math.PI/2,0,0], c:y===-1?COLORS.D:null},
+                            {p:[0.485,0,0], r:[0,Math.PI/2,0], c:x===1?COLORS.R:null},
+                            {p:[-0.485,0,0], r:[0,-Math.PI/2,0], c:x===-1?COLORS.L:null}
+                        ];
+                        sConf.forEach(s => {
+                            if(s.c) {
+                                const st = new THREE.Mesh(stickerG, new THREE.MeshLambertMaterial({color: s.c}));
+                                st.position.set(...s.p); st.rotation.set(...s.r);
+                                group.add(st);
+                            }
+                        });
+                        group.position.set(x,y,z);
+                        scene.add(group);
+                        cubePieces.push(group);
+                    }
+                }
+            }
+        }
+        initCube();
+
+        function animateMove(moveStr, duration = 120) {
+            if (isAnimating) { moveQueue.push({moveStr, duration}); return; }
+            isAnimating = true;
+            const face = moveStr[0], isPrime = moveStr.includes("'"), isDouble = moveStr.includes("2");
+            let axis, val, dir = 1;
+            switch(face) {
+                case 'U': axis='y'; val=1;  dir=-1; break;
+                case 'D': axis='y'; val=-1; dir=1;  break;
+                case 'L': axis='x'; val=-1; dir=1;  break;
+                case 'R': axis='x'; val=1;  dir=-1; break;
+                case 'F': axis='z'; val=1;  dir=-1; break;
+                case 'B': axis='z'; val=-1; dir=1;  break;
+            }
+            const group = new THREE.Group();
+            scene.add(group);
+            const targets = cubePieces.filter(p => Math.round(p.position[axis]) === val);
+            targets.forEach(p => group.attach(p));
+            let angle = (Math.PI/2) * dir;
+            if(isPrime) angle *= -1; if(isDouble) angle = Math.PI;
+
+            const start = performance.now();
+            function step() {
+                const now = performance.now();
+                const progress = Math.min((now - start) / duration, 1);
+                group.rotation[axis] = angle * (1 - Math.pow(1 - progress, 4));
+                if(progress < 1) requestAnimationFrame(step);
+                else {
+                    group.updateMatrixWorld();
+                    targets.forEach(p => {
+                        scene.attach(p);
+                        p.position.set(Math.round(p.position.x), Math.round(p.position.y), Math.round(p.position.z));
+                        p.rotation.set(Math.round(p.rotation.x/(Math.PI/2))*(Math.PI/2), Math.round(p.rotation.y/(Math.PI/2))*(Math.PI/2), Math.round(p.rotation.z/(Math.PI/2))*(Math.PI/2));
+                    });
+                    scene.remove(group);
+                    isAnimating = false;
+                    if(moveQueue.length > 0) { const n = moveQueue.shift(); animateMove(n.moveStr, n.duration); }
+                }
+            }
+            step();
+        }
+
+        // --- BLUETOOTH ---
+        let myCube = null;
+        document.getElementById('connectBtn').onclick = async () => {
+            if(myCube) return location.reload();
+            try {
+                document.getElementById('status').innerText = "LINKING HARDWARE...";
+                myCube = new BTCube();
+                await myCube.init(document.getElementById('macInput').value.trim());
+                document.getElementById('status').innerText = "LINK ACTIVE";
+                document.getElementById('connectBtn').innerText = "Terminate";
+                myCube.on('move', data => {
+                    document.getElementById('large-move').innerText = data.move;
+                    animateMove(data.move);
+                    const pill = document.createElement('div');
+                    pill.className = 'move-pill'; pill.innerText = data.move;
+                    const h = document.getElementById('history');
+                    h.appendChild(pill); h.scrollLeft = h.scrollWidth;
+                });
+            } catch(e) { document.getElementById('status').innerText = "LINK FAILED"; }
+        };
+
+        // --- UI ---
+        document.getElementById('autoView').onclick = () => autoRotate = !autoRotate;
+        document.getElementById('centerView').onclick = () => { camera.position.set(7,6,11); camera.lookAt(0,0,0); };
+        document.getElementById('resetCube').onclick = () => initCube();
+
+        function switchMode(id) {
+            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            document.getElementById('trainer-controls').style.display = id === 'modeTrainer' ? 'block' : 'none';
+            document.getElementById('game-controls').style.display = id === 'modeGames' ? 'block' : 'none';
+        }
+        document.getElementById('modePractice').onclick = () => switchMode('modePractice');
+        document.getElementById('modeComp').onclick = () => switchMode('modeComp');
+        document.getElementById('modeTrainer').onclick = () => switchMode('modeTrainer');
+        document.getElementById('modeGames').onclick = () => switchMode('modeGames');
+
+        function loop() {
+            requestAnimationFrame(loop);
+            if(autoRotate) {
+                const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.008, 0));
+                camera.position.applyQuaternion(q); camera.lookAt(0,0,0);
+            }
+            renderer.render(scene, camera);
+        }
+        loop();
+    </script>
+</body>
+</html>

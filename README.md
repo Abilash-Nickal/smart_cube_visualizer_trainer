@@ -6,10 +6,10 @@
 
 ![Project Preview](https://github.com/Abilash-Nickal/smart_cube_visualizer_trainer/raw/main/A_logo.png)
 
-##  Overview
+## 🌟 Overview
 This project connects a physical **GAN 356 i3 Smart Cube** to a web browser via **Web Bluetooth API**, rendering its movements in real-time within a stunning 3D environment. It serves as a professional-grade **Competition Timer** and **CFOP Algorithm Trainer**, featuring holographic move hints and advanced mistake tracking.
 
-##  Key Features
+## 🚀 Key Features
 - **Real-time 3D Rendering**: Powered by Three.js with procedural cube generation and rounded sticker textures for a premium aesthetic.
 - **Web Bluetooth Integration**: 100% client-side logic—no backend bridge required.
 - **CFOP Trainer**: Interactive algorithm database with "Neon Cage" holographic guidance.
@@ -31,7 +31,7 @@ This project connects a physical **GAN 356 i3 Smart Cube** to a web browser via 
 | :---: | :---: |
 | ![Trainer](screenshots/smart_trainer.png) | ![Games](screenshots/arcade_games.png) |
 
-##  System Architecture & Data Flow
+## 📊 System Architecture & Data Flow
 
 ```mermaid
 graph TD
@@ -49,7 +49,7 @@ graph TD
 
 ---
 
-##  Technical Implementation
+## 🏗️ Technical Implementation
 
 ### 1. The 3D Engine (Three.js)
 Instead of static models, the cube is built procedurally. Each of the 26 pieces is a `THREE.Group` with individual sticker textures drawn on HTML5 `<canvas>`.
@@ -64,7 +64,7 @@ We used `THREE.AdditiveBlending` and `depthWrite: false` to create glowing, tran
 
 ---
 
-##  The Journey: Challenges & Breakthroughs
+## 📜 The Journey: Challenges & Breakthroughs
 
 ### Phase 1: The Python Era (Reverse Engineering)
 Initially, we attempted a Python backend using `bleak` and `Wireshark` to sniff Bluetooth packets.
@@ -77,7 +77,7 @@ The project pivoted after discovering a custom JavaScript-native AES decryption 
 
 ---
 
-##  How to Build & Run
+## 🛠️ How to Build & Run
 1. **Clone the repository**:
    ```bash
    git clone https://github.com/Abilash-Nickal/smart_cube_visualizer_trainer.git
@@ -97,7 +97,7 @@ The project pivoted after discovering a custom JavaScript-native AES decryption 
 
 ---
 
-##  Developed By
+## 👨‍💻 Developed By
 **Abilash Nickal**
 - [GitHub](https://github.com/Abilash-Nickal)
 - [LinkedIn](https://www.linkedin.com/in/arumugam-abilashan-6916a2157/)
